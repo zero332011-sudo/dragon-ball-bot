@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 conn.commit()
 
 # أرقام المشرفين المسموح لهم بالرفع
-ADMIN_IDS = [201032219184]
+ADMIN_IDS = [7080361795]
 
 def is_admin(user_id):
     return user_id in ADMIN_IDS
