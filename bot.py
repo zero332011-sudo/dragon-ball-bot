@@ -1,12 +1,30 @@
 import os
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, MessageHandler, filters, ContextTypes
 
-# تفعيل سجل الأخطاء لمعرفة السبب بدقة لو حدث خطأ
+# تفعيل سجلات التتبع
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
-
 TOKEN = os.getenv("BOT_TOKEN")
+
+# قاموس مؤقت لحفظ القسم الذي اختاره كل مستخدم
+user_sections = {}
+
+# قاموس الحلقات المتاحة (يمكنك تعديل الروابط أو استبدالها بروابط رسائل قناتك الخاصة)
+AVAILABLE_EPISODES = {
+    "db_classic": {
+        "1": "https://t.me/your_channel/10",
+        "2": "https://t.me/your_channel/11",
+    },
+    "db_z": {
+        "1": "https://t.me/your_channel/50",
+    },
+    "db_super": {},
+    "db_daima": {},
+    "db_heroes": {},
+    "db_gt": {},
+    "db_movies": {}
+}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
@@ -29,34 +47,63 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    if query.data == "db_classic":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول الكلاسيكي**")
-    elif query.data == "db_z":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول زد**")
-    elif query.data == "db_super":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول سوبر**")
-    elif query.data == "db_daimin" or query.data == "db_daima":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول دايما**")
-    elif query.data == "db_heroes":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **سوبر دراغون بول هيروز**")
-    elif query.data == "db_gt":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول جي تي**")
-    elif query.data == "db_movies":
-        await query.edit_message_text(text="🎬 أنت الآن في قسم: **أفلام دراغون بول والخاصات**")
+    user_id = query.from_user.id
+    data = query.data
+    
+    # حفظ القسم الخاص بالمستخدم
+    user_sections[user_id] = data
+    
+    section_names = {
+        "db_classic": "دراغون بول الكلاسيكي",
+        "db_z": "دراغون بول زد",
+        "db_super": "دراغون بول سوبر",
+        "db_daima": "دراغون بول دايما",
+        "db_heroes": "سوبر دراغون بول هيروز",
+        "db_gt": "دراغون بول جي تي",
+        "db_movies": "أفلام دراغون بول والخاصات"
+    }
+    
+    current_section = section_names.get(data, "القسم")
+    
+    await query.edit_message_text(
+        text=f"✨ أنت الآن في قسم: **{current_section}**\n\n📝 أرسل الآن رقم الحلقة التي تريدها (مثال: `1` أو `2`):"
+    )
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    text = update.message.text.strip()
+    
+    # التحقق إن كان المستخدم اختار قسماً مسبقاً
+    if user_id not in user_sections:
+        await update.message.reply_text("الرجاء اختيار القسم أولاً بالضغط على /start 🔄")
+        return
+    
+    section = user_sections[user_id]
+    section_eps = AVAILABLE_EPISODES.get(section, {})
+    
+    # التحقق من توفر الحلقة
+    if text in section_eps:
+        ep_link = section_eps[text]
+        await update.message.reply_text(f"🎬 تفضل طلبك للحلقة رقم ({text}):\n{ep_link}")
+    else:
+        # رسالة في حال كانت الحلقة غير متوفرة
+        await update.message.reply_text(
+            f"⚠️ عذراً يا صديقي، الحلقة رقم ({text}) غير متوفرة حالياً في هذا القسم أو لم يتم رفعها بعد! 🛑"
+        )
 
 def main():
     if not TOKEN:
-        print("Error: BOT_TOKEN is missing!")
+        print("Error: Token not found")
         return
 
     app = ApplicationBuilder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("Bot is starting...")
-    app.run_polling()
+    print("Bot is running smoothly...")
+    app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
-   
     main()
