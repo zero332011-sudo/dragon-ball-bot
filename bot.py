@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 import asyncio
 import aiosqlite
@@ -9,12 +10,12 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID", "7080361795"))
 
-# تم تعديلها لتكون نصاً (String) لتجنب أي أخطاء برمجية
-CHANNEL_ID = "@YourChannelUsername" # إذا كانت قناتك عامة ضع اليوزر، أو ضع رقم اليدي هكذا "-100xxxxxxxxxx" بين أقواس تنصيص
+CHANNEL_ID = "@YourChannelUsername" # ضع يوزر قناتك أو الآيدي الرقمي بين أقواس تنصيص
 CHANNEL_LINK = "https://t.me/+6A997HR9zOw5NTVk"
 
 user_sections = {}
 user_upload_state = {}
+bulk_upload_state = {} # نظام الرفع الجماعي المتسلسل
 
 async def init_db():
     async with aiosqlite.connect("database.db") as db:
@@ -52,14 +53,11 @@ async def check_user_subscription(user_id, context):
     if not await get_force_sub_status():
         return True
     try:
-        # إذا كنت لم تحول القناة لعامة بعد، يمكنك جعل التحقق يعتمد على طريقة أخرى أو وضع الآيدي الرقمي الصحيح هنا
-        # ملاحظة: لفحص القنوات الخاصة، يجب أن يكون البوت مشرفاً (Admin) فيها ويُستخدم اليدي الرقمي السالب مثل "-100xxxxxxxxxx"
         member = await context.bot.get_chat_member(chat_id=CHANNEL_ID, user_id=user_id)
         if member.status in ['member', 'administrator', 'creator']:
             return True
     except Exception as e:
         logging.error(f"Subscription check error: {e}")
-        # في حال حدوث خطأ برمجتي في جلب العضوية للقنوات الخاصة الوهمية، يمكنك جعله يرجع True مؤقتاً أو التأكد من إدخال اليدي الرقمي الصحيح
         return True 
     return False
 
@@ -106,34 +104,28 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
-        [InlineKeyboardButton("📊 مساعدة الرفع", callback_data="admin_help")]
+        [InlineKeyboardButton("📊 مساعدة الرفع الجماعي", callback_data="admin_help")]
     ]
     
     await update.message.reply_text(
         "🎛️ **لوحة تحكم المشرف (الأدمن):**\n"
-        "يمكنك تفعيل أو إلغاء تفعيل ميزة الاشتراك الإجباري في القناة بضغط زر واحدة:",
+        "يمكنك التحكم في الاشتراك الإجباري أو مراجعة أوامر الرفع السريع:",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
 
+# أمر رفع حلقة مفردة
 async def upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if user_id != ADMIN_ID:
-        await update.message.reply_text("⛔ هذا الأمر مخصص للمشرف فقط.")
         return
     
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text(
-            "⚠️ الاستخدام:\n`/upload [القسم] [رقم_الحلقة]`\n\n"
-            "الأقسام:\n- `db_classic`\n- `db_z`\n- `db_super`\n- `db_daima`\n- `db_heroes`\n- `db_gt`\n- `db_movies`",
-            parse_mode="Markdown"
-        )
+        await update.message.reply_text("⚠️ الاستخدام الصحيح:\n`/upload [القسم] [رقم_الحلقة]`", parse_mode="Markdown")
         return
     
-    section = args[0]
-    ep_num = args[1]
-    
+    section, ep_num = args[0], args[1]
     valid_sections = ["db_classic", "db_z", "db_super", "db_daima", "db_heroes", "db_gt", "db_movies"]
     if section not in valid_sections:
         await update.message.reply_text("❌ اسم القسم غير صحيح.")
@@ -141,6 +133,51 @@ async def upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_upload_state[user_id] = {"section": section, "ep_number": ep_num}
     await update.message.reply_text(f"✅ تم تحديد القسم (`{section}`) ورقم الحلقة (`{ep_num}`).\n\n**أرسل فيديو الحلقة الآن:**")
+
+# أمر الرفع الجماعي المتسلسل (لبدء الرفع بالجملة)
+async def bulk_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if user_id != ADMIN_ID:
+        return
+    
+    args = context.args
+    if len(args) < 2:
+        await update.message.reply_text(
+            "⚠️ الاستخدام للرفع الجماعي:\n"
+            "`/bulk [القسم] [رقم_البداية]`\n\n"
+            "مثال: `/bulk db_z 1`\n"
+            "بعدها أرسل الحلقات وراء بعضها، وسيزداد الرقم تلقائياً!\n"
+            "للإيقاف والخروج من وضع الرفع الجماعي أرسل: `/done`",
+            parse_mode="Markdown"
+        )
+        return
+    
+    section = args[0]
+    try:
+        start_ep = int(args[1])
+    except ValueError:
+        await update.message.reply_text("❌ رقم البداية يجب أن يكون رقماً صحيحاً.")
+        return
+        
+    valid_sections = ["db_classic", "db_z", "db_super", "db_daima", "db_heroes", "db_gt", "db_movies"]
+    if section not in valid_sections:
+        await update.message.reply_text("❌ اسم القسم غير صحيح.")
+        return
+        
+    bulk_upload_state[user_id] = {"section": section, "current_ep": start_ep}
+    await update.message.reply_text(
+        f"🚀 **تم تفعيل وضع الرفع الجماعي المتسلسل بنجاح!**\n"
+        f"📂 القسم: `{section}`\n"
+        f"🔢 يبدأ من الحلقة رقم: `{start_ep}`\n\n"
+        "📥 **أرسل الفيديوهات الآن (واحداً تلو الآخر أو دفعة واحدة)، وسيتم حفظها وترقيمها تلقائياً.**\n"
+        "عند الانتهاء، أرسل الأمر: `/done`"
+    )
+
+async def done_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if user_id == ADMIN_ID and user_id in bulk_upload_state:
+        del bulk_upload_state[user_id]
+        await update.message.reply_text("🛑 تم إيقاف وضع الرفع الجماعي بنجاح.")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -153,7 +190,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.delete()
             await show_main_menu(query.message)
         else:
-            await query.answer("❌ لم تقم بالاشتراك في القناة بعد! اشترك ثم حاول مجدداً.", show_alert=True)
+            await query.answer("❌ لم تقم بالاشتراك في القناة بعد!", show_alert=True)
         return
 
     if data == "toggle_sub" and user_id == ADMIN_ID:
@@ -162,49 +199,73 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await set_force_sub_status(new_status)
         
         status_text = "🟢 مفعل" if new_status else "🔴 معطل"
-        keyboard = [
-            [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
-        ]
+        keyboard = [[InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")]]
         await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if data == "admin_help":
         await query.message.reply_text(
-            "💡 لرفع حلقة جديدة:\n"
-            "استخدم الأمر: `/upload [اسم_القسم] [رقم_الحلقة]`\n"
-            "ثم أرسل الفيديو للبوت."
+            "💡 **دليل الرفع السريع:**\n"
+            "1️⃣ لحلقة مفردة: `/upload [القسم] [الرقم]`\n"
+            "2️⃣ لرفع مجموعة متسلسلة: `/bulk [القسم] [رقم البداية]` ثم أرسل الحلقات تباعاً.\n"
+            "3️⃣ لإيقاف الرفع الجماعي: `/done`"
         )
         return
 
     if not await check_user_subscription(user_id, context):
-        await query.answer("⚠️ يجب الاشتراك في القناة أولاً لاستخدام البوت!", show_alert=True)
+        await query.answer("⚠️ يجب الاشتراك في القناة أولاً!", show_alert=True)
         return
 
     user_sections[user_id] = data
     section_names = {
-        "db_classic": "دراغون بول الكلاسيكي",
-        "db_z": "دراغون بول زد",
-        "db_super": "دراغون بول سوبر",
-        "db_daima": "دراغون بول دايما",
-        "db_heroes": "سوبر دراغون بول هيروز",
-        "db_gt": "دراغون بول جي تي",
+        "db_classic": "دراغون بول الكلاسيكي", "db_z": "دراغون بول زد",
+        "db_super": "دراغون بول سوبر", "db_daima": "دراغون بول دايما",
+        "db_heroes": "سوبر دراغون بول هيروز", "db_gt": "دراغون بول جي تي",
         "db_movies": "أفلام دراغون بول والخاصات"
     }
-    current_section = section_names.get(data, "القسم")
-    
-    await query.edit_message_text(
-        text=f"✨ أنت الآن في قسم: **{current_section}**\n\n📝 أرسل الآن رقم الحلقة التي تريدها:"
-    )
+    await query.edit_message_text(text=f"✨ أنت الآن في قسم: **{section_names.get(data, 'القسم')}**\n\n📝 أرسل رقم الحلقة التي تريدها:")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     
+    # 1. نظام الرفع الجماعي المتسلسل (Bulk Upload)
+    if user_id == ADMIN_ID and user_id in bulk_upload_state:
+        if update.message.video or update.message.document:
+            file_id = update.message.video.file_id if update.message.video else update.message.document.file_id
+            file_name = update.message.video.file_name if (update.message.video and update.message.video.file_name) else (update.message.document.file_name if update.message.document else "")
+            
+            # محاولة استخراج رقم الحلقة من اسم الملف تلقائياً إن وجد، وإلا نستخدم الترقيم المتسلسل
+            state = bulk_upload_state[user_id]
+            section = state["section"]
+            ep_num = str(state["current_ep"])
+            
+            if file_name:
+                numbers = re.findall(r'\d+', file_name)
+                if numbers:
+                    # نأخذ آخر رقم في اسم الملف غالباً ما يعبر عن رقم الحلقة
+                    ep_num = numbers[-1]
+            
+            async with aiosqlite.connect("database.db") as db:
+                await db.execute(
+                    "INSERT OR REPLACE INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)",
+                    (section, ep_num, file_id)
+                )
+                await db.commit()
+            
+            # تحديث رقم الحلقة التلقائي للرقم التالي
+            bulk_upload_state[user_id]["current_ep"] = int(ep_num) + 1
+            await update.message.reply_text(f"📥 تم حفظ الحلقة رقم ({ep_num}) بنجاح في قسم (`{section}`). (جاهز للحلقة التالية...)")
+            return
+        else:
+            await update.message.reply_text("⚠️ أنت في وضع الرفع الجماعي، أرسل الفيديوهات الآن أو اكتب `/done` للإنهاء.")
+            return
+
+    # 2. رفع حلقة مفردة بالطريقة العادية
     if user_id == ADMIN_ID and user_id in user_upload_state:
         if update.message.video or update.message.document:
             file_id = update.message.video.file_id if update.message.video else update.message.document.file_id
             state = user_upload_state[user_id]
-            section = state["section"]
-            ep_num = state["ep_number"]
+            section, ep_num = state["section"], state["ep_number"]
             
             async with aiosqlite.connect("database.db") as db:
                 await db.execute(
@@ -214,12 +275,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await db.commit()
             
             del user_upload_state[user_id]
-            await update.message.reply_text(f"🎉 تم حفظ الحلقة رقم ({ep_num}) في قسم (`{section}`) بنجاح تام!")
+            await update.message.reply_text(f"🎉 تم حفظ الحلقة رقم ({ep_num}) في قسم (`{section}`) بنجاح!")
             return
         else:
-            await update.message.reply_text("⚠️ أنت في وضع الرفع، أرسل ملف فيديو الحلقة الآن.")
+            await update.message.reply_text("⚠️ أنت في وضع الرفع، أرسل ملف الفيديو الآن.")
             return
 
+    # 3. التحقق من الاشتراك للمستخدمين العاديين
     if not await check_user_subscription(user_id, context):
         keyboard = [
             [InlineKeyboardButton("📢 اشترك في القناة هنا", url=CHANNEL_LINK)],
@@ -231,15 +293,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # 4. استقبال طلبات الحلقات العادية من المستخدمين
     if update.message.text:
         text = update.message.text.strip()
-        
         if user_id not in user_sections:
             await update.message.reply_text("الرجاء اختيار القسم أولاً بالضغط على /start 🔄")
             return
         
         section = user_sections[user_id]
-        
         async with aiosqlite.connect("database.db") as db:
             async with db.execute(
                 "SELECT file_id FROM episodes WHERE section = ? AND ep_number = ?",
@@ -248,10 +309,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 row = await cursor.fetchone()
                 
         if row:
-            file_id = row[0]
-            await context.bot.send_video(chat_id=update.message.chat_id, video=file_id, caption=f"🎬 تفضل طلبك للحلقة رقم ({text})")
+            await context.bot.send_video(chat_id=update.message.chat_id, video=row[0], caption=f"🎬 تفضل طلبك للحلقة رقم ({text})")
         else:
-            await update.message.reply_text(f"⚠️ عذراً يا صديقي، الحلقة رقم ({text}) غير متوفرة حالياً في هذا القسم أو لم يتم رفعها بعد! 🛑")
+            await update.message.reply_text(f"⚠️ عذراً، الحلقة رقم ({text}) غير متوفرة حالياً في هذا القسم! 🛑")
 
 def main():
     if not TOKEN:
@@ -264,11 +324,14 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("upload", upload_command))
+    app.add_handler(CommandHandler("bulk", bulk_upload_command))
+    app.add_handler(CommandHandler("done", done_command))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler((filters.TEXT | filters.VIDEO | filters.Document.ALL) & ~filters.COMMAND, handle_message))
     
-    print("Bot is running successfully...")
+    print("Bot with Bulk Upload is running...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
+                              
