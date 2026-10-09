@@ -86,6 +86,7 @@ async def show_main_menu(message):
     keyboard = [
         [InlineKeyboardButton("🐉 دراغون بول الكلاسيكي", callback_data="db_classic")],
         [InlineKeyboardButton("⚡ دراغون بول زد", callback_data="db_z")],
+        [InlineKeyboardButton("⚔️ دراغون بول زد كاي", callback_data="db_kai")],
         [InlineKeyboardButton("🔥 دراغون بول سوبر", callback_data="db_super")],
         [InlineKeyboardButton("🔥 دراغون بول سوبر 2 (الإصدار الجديد)", callback_data="db_super_2")],
         [InlineKeyboardButton("✨ دراغون بول دايما", callback_data="db_daima")],
@@ -133,7 +134,7 @@ async def upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     section, ep_num = args[0], args[1]
-    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
+    valid_sections = ["db_classic", "db_z", "db_kai", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
     if section not in valid_sections:
         await update.message.reply_text("❌ اسم القسم غير صحيح.")
         return
@@ -155,6 +156,7 @@ async def bulk_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             "📋 **أوامر الأقسام الجاهزة للنسخ:**\n"
             "• دراغون بول الكلاسيكي: `/bulk db_classic 1`\n"
             "• دراغون بول زد: `/bulk db_z 1`\n"
+            "• دراغون بول زد كاي: `/bulk db_kai 1`\n"
             "• دراغون بول سوبر: `/bulk db_super 1`\n"
             "• دراغون بول سوبر 2: `/bulk db_super_2 1`\n"
             "• دراغون بول دايما: `/bulk db_daima 1`\n"
@@ -174,7 +176,7 @@ async def bulk_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ رقم البداية يجب أن يكون رقماً صحيحاً.")
         return
         
-    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
+    valid_sections = ["db_classic", "db_z", "db_kai", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
     if section not in valid_sections:
         await update.message.reply_text(f"❌ اسم القسم غير صحيح. الأقسام المتاحة:\n`" + "`, `".join(valid_sections) + "`", parse_mode="Markdown")
         return
@@ -227,6 +229,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💡 **دليل وأوامر الرفع الجماعي لكل الأقسام:**\n\n"
             "• **دراغون بول الكلاسيكي:**\n`/bulk db_classic 1`\n\n"
             "• **دراغون بول زد:**\n`/bulk db_z 1`\n\n"
+            "• **دراغون بول زد كاي:**\n`/bulk db_kai 1`\n\n"
             "• **دراغون بول سوبر:**\n`/bulk db_super 1`\n\n"
             "• **دراغون بول سوبر 2 (الجديد):**\n`/bulk db_super_2 1`\n\n"
             "• **دراغون بول دايما:**\n`/bulk db_daima 1`\n\n"
@@ -246,10 +249,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_sections[user_id] = data
     section_names = {
         "db_classic": "دراغون بول الكلاسيكي", "db_z": "دراغون بول زد",
-        "db_super": "دراغون بول سوبر", "db_super_2": "دراغون بول سوبر 2",
-        "db_daima": "دراغون بول دايما", "db_heroes": "سوبر دراغون بول هيروز",
-        "db_gt": "دراغون بول جي تي", "db_specials": "الحلقات الخاصة",
-        "db_movies": "قائمة الأفلام"
+        "db_kai": "دراغون بول زد كاي", "db_super": "دراغون بول سوبر",
+        "db_super_2": "دراغون بول سوبر 2", "db_daima": "دراغون بول دايما",
+        "db_heroes": "سوبر دراغون بول هيروز", "db_gt": "دراغون بول جي تي",
+        "db_specials": "الحلقات الخاصة", "db_movies": "قائمة الأفلام"
     }
     await query.edit_message_text(text=f"✨ أنت الآن في قسم: **{section_names.get(data, 'القسم')}**\n\n📝 أرسل رقم الحلقة التي تريدها:")
 
@@ -257,20 +260,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     
-    # 1. نظام الرفع الجماعي المتسلسل (Bulk Upload) للأدمن
+    # 1. نظام الرفع الجماعي المتسلسل (Bulk Upload) للأدمن (مع العداد التصاعدي التلقائي)
     if user_id == ADMIN_ID and user_id in bulk_upload_state:
         if update.message.video or update.message.document:
             file_id = update.message.video.file_id if update.message.video else update.message.document.file_id
-            file_name = update.message.video.file_name if (update.message.video and update.message.video.file_name) else (update.message.document.file_name if update.message.document else "")
             
             state = bulk_upload_state[user_id]
             section = state["section"]
             ep_num = str(state["current_ep"])
-            
-            if file_name:
-                numbers = re.findall(r'\d+', file_name)
-                if numbers:
-                    ep_num = numbers[-1]
             
             async with aiosqlite.connect("database.db") as db:
                 await db.execute(
@@ -360,4 +357,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
