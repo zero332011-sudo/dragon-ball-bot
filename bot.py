@@ -17,15 +17,13 @@ CREATE TABLE IF NOT EXISTS episodes (
 ''')
 conn.commit()
 
-# أرقام المطورين أو المشرفين المسموح لهم بالرفع
-ADMIN_IDS = [201032219184, 123456789] # أضف الأيدي الخاص بك هنا
+# أرقام المشرفين المسموح لهم بالرفع
+ADMIN_IDS = [201032219184]
 
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # دعم العمل في المحادثات الخاصة والجماعية
-    chat = update.effective_chat
     user = update.effective_user
     
     keyboard = [
@@ -52,15 +50,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['selected_section'] = section
     
     await query.message.reply_text(
-        f"✅ تم اختيار القسم بنجاح.\n"
-        f"الرجاء إرسال **رقم الحلقة** المطلوبة الآن (مثال: 1 أو 5):"
+        "✅ تم اختيار القسم بنجاح.\n"
+        "الرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5):"
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    user_id = update.effective_user.id
     
-    # إذا ارسل المستخدم رقم حلقة وكان قد اختار قسم مسبقاً
     if 'selected_section' in context.user_data:
         section = context.user_data['selected_section']
         
@@ -73,23 +69,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await update.message.reply_text(f"⚠️ عذراً، الحلقة رقم ({text}) غير متوفرة في هذا القسم حالياً.")
     else:
-        # إذا أرسل رسالة عادية ولم يحدد قسم
         if update.effective_chat.type in ["group", "supergroup"]:
-            # في المجموعات يمكننا تجاهل الرسائل العادية التي ليست أوامر لتجنب الإزعاج
             return
         await update.message.reply_text("الرجاء استخدام الأمر /start للبدء واختيار القسم أولاً.")
 
-# أمر لرفع الحلقات (خاص بالمشرفين فقط)
 async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("⛔ هذا الأمر مخصص للمشرفين فقط.")
         return
 
-    # الطريقة: /upload [القسم] [رقم الحلقة] ويجب أن يكون مرفقاً بفيديو
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text("الاستخدام الصحيح:\n`/upload db_z 1` (مع إرفاق الفيديو أو الـ file_id)")
+        await update.message.reply_text("الاستخدام الصحيح:\n/upload db_z 1 (مع إرفاق أو الرد على فيديو الحلقة)")
         return
     
     section = args[0]
@@ -106,7 +98,6 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الرجاء الرد على رسالة الفيديو بالأمر الصحيح لحفظه في قاعدة البيانات.")
 
 def main():
-    # ضع هنا توكن بوت التيليجرام الخاص بك
     TOKEN = "8911756458:AAHtom5VBOPb6rBCmejD59RDNgI7iwocIbg"
     
     app = ApplicationBuilder().token(TOKEN).build()
@@ -119,6 +110,5 @@ def main():
     print("Telegram bot is running...")
     app.run_polling()
 
-if __name__ == '__main__
-':
-    main()
+if __name__ == '__main__': 
+   main()
