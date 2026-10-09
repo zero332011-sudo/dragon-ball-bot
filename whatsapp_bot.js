@@ -7,45 +7,46 @@ const db = new sqlite3.Database('./database.db', (err) => {
     else console.log('تم اتصال بوت الواتساب بقاعدة البيانات بنجاح.');
 });
 
-// إعداد عميل الواتساب مع دعم رقم الهاتف
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--disable-gpu'
+        ]
     }
 });
 
-// رقم الهاتف المراد ربطه (بدون علامات أو مسافات، مع رمز الدولة مثلاً: مصر 20)
-const PHONE_NUMBER = "201154684341"; 
+// رقم هاتف البوت والرقم المطور
+const PHONE_NUMBER = "201154684341";
+const DEVELOPER_NUMBER = "201032219184@c.us"; // رقم المطور
 
-client.on('qr', (qr) => {
-    // تم إيقاف الاعتماد على QR وتفعيل طريقة رقم الهاتف أدناه
+client.on('qr', async (qr) => {
+    // تم تخطي الـ QR والاعتماد على رمز الاقتران برقم الهاتف
 });
 
-client.on('ready', async () => {
-    console.log('WhatsApp Bot is online and connected successfully!');
+client.on('ready', () => {
+    console.log('✅ WhatsApp Bot is online and connected successfully!');
 });
 
-// محاولة ربط الجهاز باستخدام رقم الهاتف وطلب رمز الاقتران (Pairing Code)
-client.on('authenticated', () => {
-    console.log('تم توثيق جلسة الواتساب بنجاح!');
-});
-
-// عند جاهزية العميل للبدء في عملية الربط برقم الهاتف
+// طلب رمز الاقتران برقم الهاتف بعد تشغيل العميل
 setTimeout(async () => {
     try {
-        if (!client.info || !client.info.wid) {
-            console.log(`جاري طلب رمز الاقتران (Pairing Code) لرقم الهاتف: ${PHONE_NUMBER}...`);
-            const pairingCode = await client.requestPairingCode(PHONE_NUMBER);
-            console.log(`========================================`);
-            console.log(`🔑 رمز الاقتران الخاص بك هو: ${pairingCode}`);
-            console.log(`========================================`);
-            console.log(`أدخل هذا الرمز في تطبيق الواتساب على هاتفك في خيار (ربط الجهاز برقم الهاتف).`);
-        }
+        console.log(`جاري طلب رمز الاقتران لرقم الهاتف: ${PHONE_NUMBER}...`);
+        const pairingCode = await client.requestPairingCode(PHONE_NUMBER);
+        console.log(`\n========================================`);
+        console.log(`🔑 رمز الاقتران الخاص بك هو: ${pairingCode}`);
+        console.log(`========================================\n`);
     } catch (error) {
         console.error('خطأ أثناء طلب رمز الاقتران:', error);
     }
-}, 5000);
+}, 6000);
 
 const userSections = {};
 
@@ -53,12 +54,19 @@ client.on('message', async (message) => {
     const chatId = message.from;
     const text = message.body.trim();
 
+    // التحقق إذا كانت الرسالة من المطور
+    const isDeveloper = chatId === DEVELOPER_NUMBER;
+
     if (text === '/start' || text === 'القائمة' || text === 'مرحبا') {
         userSections[chatId] = null;
-        await message.reply(
-            "🔥 *أهلاً بك في بوت دراغون بول عبر الواتساب!*\n\n" +
-            "أرسل كود القسم المطلوب أولاً (مثال: `db_z` أو `db_kai` أو `db_classic`)، ثم أرسل رقم الحلقة."
-        );
+        let replyText = "🔥 *أهلاً بك في بوت دراغون بول عبر الواتساب!*\n\n" +
+            "أرسل كود القسم المطلوب (مثال: `db_z` أو `db_kai` أو `db_classic`)، ثم أرسل رقم الحلقة.";
+        
+        if (isDeveloper) {
+            replyText += "\n\n🛠️ *مرحباً بك يا مطور النظام (صلاحيات كاملة مفعلة).*";
+        }
+
+        await message.reply(replyText);
         return;
     }
 
