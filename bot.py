@@ -91,7 +91,8 @@ async def show_main_menu(message):
         [InlineKeyboardButton("✨ دراغون بول دايما", callback_data="db_daima")],
         [InlineKeyboardButton("💫 سوبر دراغون بول هيروز", callback_data="db_heroes")],
         [InlineKeyboardButton("🌀 دراغون بول جي تي", callback_data="db_gt")],
-        [InlineKeyboardButton("🎬 قائمة الأفلام والخاصات", callback_data="db_movies")]
+        [InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials")],
+        [InlineKeyboardButton("🎬 قائمة الأفلام", callback_data="db_movies")]
     ]
     
     await message.reply_text(
@@ -110,7 +111,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
-        [InlineKeyboardButton("📊 مساعدة الرفع الجماعي", callback_data="admin_help")]
+        [InlineKeyboardButton("📊 مساعدة الأوامر والرفع الجماعي", callback_data="admin_help")]
     ]
     
     await update.message.reply_text(
@@ -132,7 +133,7 @@ async def upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     section, ep_num = args[0], args[1]
-    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_movies"]
+    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
     if section not in valid_sections:
         await update.message.reply_text("❌ اسم القسم غير صحيح.")
         return
@@ -149,11 +150,19 @@ async def bulk_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     args = context.args
     if len(args) < 2:
         await update.message.reply_text(
-            "⚠️ الاستخدام للرفع الجماعي:\n"
+            "⚠️ **الاستخدام الصحيح للرفع الجماعي:**\n"
             "`/bulk [القسم] [رقم_البداية]`\n\n"
-            "مثال لرفع سوبر 2: `/bulk db_super_2 1`\n"
-            "بعدها أرسل الحلقات وراء بعضها، وسيقوم البوت بالترقيم واستخراج الأرقام تلقائياً!\n"
-            "للإيقاف والخروج أرسل: `/done`",
+            "📋 **أوامر الأقسام الجاهزة للنسخ:**\n"
+            "• دراغون بول الكلاسيكي: `/bulk db_classic 1`\n"
+            "• دراغون بول زد: `/bulk db_z 1`\n"
+            "• دراغون بول سوبر: `/bulk db_super 1`\n"
+            "• دراغون بول سوبر 2: `/bulk db_super_2 1`\n"
+            "• دراغون بول دايما: `/bulk db_daima 1`\n"
+            "• سوبر دراغون بول هيروز: `/bulk db_heroes 1`\n"
+            "• دراغون بول جي تي: `/bulk db_gt 1`\n"
+            "• الحلقات الخاصة: `/bulk db_specials 1`\n"
+            "• قائمة الأفلام: `/bulk db_movies 1`\n\n"
+            "طريقة العمل: انسخ الأمر المناسب، أرسله، ثم أرسل الحلقات وراء بعضها، وللإنهاء والخروج أرسل: `/done`",
             parse_mode="Markdown"
         )
         return
@@ -165,12 +174,15 @@ async def bulk_upload_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ رقم البداية يجب أن يكون رقماً صحيحاً.")
         return
         
-    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_movies"]
+    valid_sections = ["db_classic", "db_z", "db_super", "db_super_2", "db_daima", "db_heroes", "db_gt", "db_specials", "db_movies"]
     if section not in valid_sections:
-        await update.message.reply_text("❌ اسم القسم غير صحيح.")
+        await update.message.reply_text(f"❌ اسم القسم غير صحيح. الأقسام المتاحة:\n`" + "`, `".join(valid_sections) + "`", parse_mode="Markdown")
         return
         
     bulk_upload_state[user_id] = {"section": section, "current_ep": start_ep}
+    if user_id in user_sections:
+        del user_sections[user_id]
+
     await update.message.reply_text(
         f"🚀 **تم تفعيل وضع الرفع الجماعي المتسلسل بنجاح!**\n"
         f"📂 القسم: `{section}`\n"
@@ -212,10 +224,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "admin_help":
         await query.message.reply_text(
-            "💡 **دليل الرفع السريع:**\n"
-            "1️⃣ لحلقة مفردة: `/upload [القسم] [الرقم]`\n"
-            "2️⃣ لرفع مجموعة متسلسلة: `/bulk [القسم] [رقم البداية]` ثم أرسل الحلقات.\n"
-            "3️⃣ لإيقاف الرفع الجماعي: `/done`"
+            "💡 **دليل وأوامر الرفع الجماعي لكل الأقسام:**\n\n"
+            "• **دراغون بول الكلاسيكي:**\n`/bulk db_classic 1`\n\n"
+            "• **دراغون بول زد:**\n`/bulk db_z 1`\n\n"
+            "• **دراغون بول سوبر:**\n`/bulk db_super 1`\n\n"
+            "• **دراغون بول سوبر 2 (الجديد):**\n`/bulk db_super_2 1`\n\n"
+            "• **دراغون بول دايما:**\n`/bulk db_daima 1`\n\n"
+            "• **سوبر دراغون بول هيروز:**\n`/bulk db_heroes 1`\n\n"
+            "• **دراغون بول جي تي:**\n`/bulk db_gt 1`\n\n"
+            "• **الحلقات الخاصة:**\n`/bulk db_specials 1`\n\n"
+            "• **قائمة الأفلام:**\n`/bulk db_movies 1`\n\n"
+            "📌 *ملاحظة:* استبدل الرقم `1` برقم البداية الذي تريده، ثم أرسل الحلقات واكتب `/done` عند الانتهاء.",
+            parse_mode="Markdown"
         )
         return
 
@@ -228,7 +248,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "db_classic": "دراغون بول الكلاسيكي", "db_z": "دراغون بول زد",
         "db_super": "دراغون بول سوبر", "db_super_2": "دراغون بول سوبر 2",
         "db_daima": "دراغون بول دايما", "db_heroes": "سوبر دراغون بول هيروز",
-        "db_gt": "دراغون بول جي تي", "db_movies": "أفلام دراغون بول والخاصات"
+        "db_gt": "دراغون بول جي تي", "db_specials": "الحلقات الخاصة",
+        "db_movies": "قائمة الأفلام"
     }
     await query.edit_message_text(text=f"✨ أنت الآن في قسم: **{section_names.get(data, 'القسم')}**\n\n📝 أرسل رقم الحلقة التي تريدها:")
 
@@ -246,7 +267,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             section = state["section"]
             ep_num = str(state["current_ep"])
             
-            # قراءة رقم الحلقة تلقائياً من اسم الملف إن وجد
             if file_name:
                 numbers = re.findall(r'\d+', file_name)
                 if numbers:
@@ -259,7 +279,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 await db.commit()
             
-            # تحديث العداد التلقائي للرقم التالي
             bulk_upload_state[user_id]["current_ep"] = int(ep_num) + 1
             await update.message.reply_text(f"📥 تم حفظ الحلقة رقم ({ep_num}) بنجاح في قسم (`{section}`). (جاهز للحلقة التالية...)")
             return
@@ -336,9 +355,9 @@ def main():
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler((filters.TEXT | filters.VIDEO | filters.Document.ALL) & ~filters.COMMAND, handle_message))
     
-    print("Bot with Dragon Ball Super 2 is running smoothly...")
+    print("Bot is running smoothly...")
     app.run_polling(drop_pending_updates=True)
 
 if __name__ == "__main__":
     main()
-        
+    
