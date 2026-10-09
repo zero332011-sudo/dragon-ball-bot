@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 ''')
 conn.commit()
 
-# أرقام المشرفين المسموح لهم بالرفع
+# أرقام المشرفين المسموح لهم بالرفع وإدارة البوت
 ADMIN_IDS = [7080361795]
 
 def is_admin(user_id):
@@ -27,20 +27,38 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
     keyboard = [
-        [InlineKeyboardButton("🐉 دراغون بول الكلاسيكي", callback_data="db_classic"),
-         InlineKeyboardButton("🔥 دراغون بول Z", callback_data="db_z")],
-        [InlineKeyboardButton("⚡ دراغون بول كاي", callback_data="db_kai"),
-         InlineKeyboardButton("⭐ دراغون بول سوبر", callback_data="db_super")],
-        [InlineKeyboardButton("🎬 الأفلام والحلقات الخاصة", callback_data="db_movies")]
+        [InlineKeyboardButton("🐉 دراغون بول الكلاسيكي", callback_data="db_classic")],
+        [InlineKeyboardButton("⚡ دراغون بول زد", callback_data="db_z")],
+        [InlineKeyboardButton("⚔️ دراغون بول زد كاي", callback_data="db_kai")],
+        [InlineKeyboardButton("🔥 دراغون بول سوبر", callback_data="db_super")],
+        [InlineKeyboardButton("🔥 دراغون بول سوبر 2 (الإصدار الجديد)", callback_data="db_super2")],
+        [InlineKeyboardButton("✨ دراغون بول دايما", callback_data="db_daima")],
+        [InlineKeyboardButton("💫 سوبر دراغون بول هيروز", callback_data="db_heroes")],
+        [InlineKeyboardButton("🌀 دراغون بول جي تي", callback_data="db_gt")],
+        [InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials")],
+        [InlineKeyboardButton("🎬 قائمة الأفلام", callback_data="db_movies")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     welcome_text = (
         f"مرحباً بك يا {user.first_name} في بوت أنمي دراغون بول!\n"
-        "اختر القسم المطلوب من الأزرار بالأسفل، ثم أرسل رقم الحلقة لعرضها:"
+        "اختر القسم الذي ترغب في تصفحه من الأزرار بالأسفل، ثم أرسل رقم الحلقة لعرضها:"
     )
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if not is_admin(user_id):
+        await update.message.reply_text("⛔ هذا الأمر مخصص للمشرفين فقط.")
+        return
+
+    admin_text = (
+        "🎛️ لوحة تحكم المشرف (الأدمن):\n"
+        "يمكنك استخدام أمر الرفع السريع:\n"
+        "مثال للرفع: `/upload db_z 1` (مع الرد على رسالة الفيديو)"
+    )
+    await update.message.reply_text(admin_text)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -55,6 +73,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.text:
+        return
+        
     text = update.message.text.strip()
     
     if 'selected_section' in context.user_data:
@@ -81,7 +102,7 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text("الاستخدام الصحيح:\n/upload db_z 1 (مع إرفاق أو الرد على فيديو الحلقة)")
+        await update.message.reply_text("الاستخدام الصحيح:\n/upload db_z 1 (مع الرد على فيديو الحلقة)")
         return
     
     section = args[0]
@@ -103,6 +124,7 @@ def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("admin", admin_panel))
     app.add_handler(CommandHandler("upload", upload_episode))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
@@ -112,3 +134,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    
