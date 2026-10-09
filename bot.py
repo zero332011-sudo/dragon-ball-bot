@@ -54,9 +54,18 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     admin_text = (
-        "🎛️ لوحة تحكم المشرف (الأدمن):\n"
-        "يمكنك استخدام أمر الرفع السريع:\n"
-        "مثال للرفع: `/upload db_z 1` (مع الرد على رسالة الفيديو)"
+        "🎛️ لوحة تحكم المشرف (الأدمن):\n\n"
+        "أوامر الرفع لكل قسم (قم بالرد على الفيديو بالأمر المناسب):\n"
+        "• الكلاسيكي: `/upload db_classic 1`\n"
+        "• زد: `/upload db_z 1`\n"
+        "• زد كاي: `/upload db_kai 1`\n"
+        "• سوبر: `/upload db_super 1`\n"
+        "• سوبر 2: `/upload db_super2 1`\n"
+        "• دايما: `/upload db_daima 1`\n"
+        "• هيروز: `/upload db_heroes 1`\n"
+        "• جي تي: `/upload db_gt 1`\n"
+        "• الحلقات الخاصة: `/upload db_specials 1`\n"
+        "• الأفلام: `/upload db_movies 1`"
     )
     await update.message.reply_text(admin_text)
 
@@ -102,7 +111,7 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) < 2:
-        await update.message.reply_text("الاستخدام الصحيح:\n/upload db_z 1 (مع الرد على فيديو الحلقة)")
+        await update.message.reply_text("الاستخدام الصحيح:\n/upload db_z 1 (مع الرد على رسالة الفيديو)")
         return
     
     section = args[0]
