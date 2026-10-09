@@ -1,5 +1,4 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
 const sqlite3 = require('sqlite3').verbose();
 
 // الاتصال بقاعدة البيانات المشتركة
@@ -8,18 +7,45 @@ const db = new sqlite3.Database('./database.db', (err) => {
     else console.log('تم اتصال بوت الواتساب بقاعدة البيانات بنجاح.');
 });
 
+// إعداد عميل الواتساب مع دعم رقم الهاتف
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth(),
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
+
+// رقم الهاتف المراد ربطه (بدون علامات أو مسافات، مع رمز الدولة مثلاً: مصر 20)
+const PHONE_NUMBER = "201154684341"; 
 
 client.on('qr', (qr) => {
-    console.log('--- QR CODE FOR WHATSAPP ---');
-    qrcode.generate(qr, { small: true });
+    // تم إيقاف الاعتماد على QR وتفعيل طريقة رقم الهاتف أدناه
 });
 
-client.on('ready', () => {
-    console.log('WhatsApp Bot is online and connected!');
+client.on('ready', async () => {
+    console.log('WhatsApp Bot is online and connected successfully!');
 });
+
+// محاولة ربط الجهاز باستخدام رقم الهاتف وطلب رمز الاقتران (Pairing Code)
+client.on('authenticated', () => {
+    console.log('تم توثيق جلسة الواتساب بنجاح!');
+});
+
+// عند جاهزية العميل للبدء في عملية الربط برقم الهاتف
+setTimeout(async () => {
+    try {
+        if (!client.info || !client.info.wid) {
+            console.log(`جاري طلب رمز الاقتران (Pairing Code) لرقم الهاتف: ${PHONE_NUMBER}...`);
+            const pairingCode = await client.requestPairingCode(PHONE_NUMBER);
+            console.log(`========================================`);
+            console.log(`🔑 رمز الاقتران الخاص بك هو: ${pairingCode}`);
+            console.log(`========================================`);
+            console.log(`أدخل هذا الرمز في تطبيق الواتساب على هاتفك في خيار (ربط الجهاز برقم الهاتف).`);
+        }
+    } catch (error) {
+        console.error('خطأ أثناء طلب رمز الاقتران:', error);
+    }
+}, 5000);
 
 const userSections = {};
 
@@ -31,7 +57,7 @@ client.on('message', async (message) => {
         userSections[chatId] = null;
         await message.reply(
             "🔥 *أهلاً بك في بوت دراغون بول عبر الواتساب!*\n\n" +
-            "أرسل كود القسم المطلوبة (مثال: `db_z` أو `db_kai` أو `db_classic`)، ثم أرسل رقم الحلقة."
+            "أرسل كود القسم المطلوب أولاً (مثال: `db_z` أو `db_kai` أو `db_classic`)، ثم أرسل رقم الحلقة."
         );
         return;
     }
@@ -66,5 +92,4 @@ client.on('message', async (message) => {
     }
 });
 
-client.in
-      itialize();
+client.initialize();
