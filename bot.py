@@ -1,11 +1,13 @@
 import os
+import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes
 
-# قراءة الـ Token من متغيرات البيئة في Railway
+# تفعيل سجل الأخطاء لمعرفة السبب بدقة لو حدث خطأ
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+
 TOKEN = os.getenv("BOT_TOKEN")
 
-# دالة بدء البوت وإرسال الأقسام كأزرار تفاعلية
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🐉 دراغون بول الكلاسيكي (153 حلقة)", callback_data="db_classic")],
@@ -18,41 +20,43 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # التحقق مما إذا كان الطلب من رسالة عادية أو ضغط على زر
-    if update.message:
-        await update.message.reply_text(
-            "🔥 أهلاً بك في بوت دراغون بول الرسمي!\nاختر القسم الذي ترغب في تصفحه:",
-            reply_markup=reply_markup
-        )
+    await update.message.reply_text(
+        "🔥 أهلاً بك في بوت دراغون بول الرسمي!\nاختر القسم الذي ترغب في تصفحه:",
+        reply_markup=reply_markup
+    )
 
-# دالة للتعامل مع الضغط على الأزرار
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     
-    # الرد بناءً على القسم الذي اختاره المستخدم
     if query.data == "db_classic":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول الكلاسيكي**\nقريباً سيتم إرسال الحلقات هنا!")
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول الكلاسيكي**")
     elif query.data == "db_z":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول زد**\nقريباً سيتم إرسال الحلقات هنا!")
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول زد**")
     elif query.data == "db_super":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول سوبر**\nقريباً سيتم إرسال الحلقات هنا!")
-    elif query.data == "db_daima":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول دايما**\nقريباً سيتم إرسال الحلقات هنا!")
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول سوبر**")
+    elif query.data == "db_daimin" or query.data == "db_daima":
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول دايما**")
     elif query.data == "db_heroes":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **سوبر دراغون بول هيروز**\nقريباً سيتم إرسال الحلقات هنا!")
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **سوبر دراغون بول هيروز**")
     elif query.data == "db_gt":
-        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول جي تي**\nقريباً سيتم إرسال الحلقات هنا!")
+        await query.edit_message_text(text="✨ أنت الآن في قسم: **دراغون بول جي تي**")
     elif query.data == "db_movies":
-        await query.edit_message_text(text="🎬 أنت الآن في قسم: **أفلام دراغون بول والخاصات**\nقريباً سيتم إرسال الأفلام هنا!")
+        await query.edit_message_text(text="🎬 أنت الآن في قسم: **أفلام دراغون بول والخاصات**")
 
-if __name__ == "__main__":
+def main():
+    if not TOKEN:
+        print("Error: BOT_TOKEN is missing!")
+        return
+
     app = ApplicationBuilder().token(TOKEN).build()
     
-    # إضافة الأوامر ومعالجة الأزرار
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     
-    print("Bot is running...")
-    app.run_polli
-    ng()
+    print("Bot is starting...")
+    app.run_polling()
+
+if __name__ == "__main__":
+   
+    main()
