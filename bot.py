@@ -98,7 +98,7 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الرجاء الرد على رسالة الفيديو بالأمر الصحيح لحفظه في قاعدة البيانات.")
 
 def main():
-    TOKEN = "8911756458:AAHtom5VBOPb6rBCmejD59RDNgI7iwocIbg"
+    TOKEN = "8911756458:AAE0fgUD-kxKI5Q34yuFG-NRBXd7icJn32c"
     
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -110,5 +110,5 @@ def main():
     print("Telegram bot is running...")
     app.run_polling()
 
-if __name__ == '__main__': 
-   main()
+if __name__ == '__main__':
+    main()
