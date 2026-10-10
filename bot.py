@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS episodes (
 ''')
 conn.commit()
 
-# الروابط الثابتة للواتساب والتليجرام والفيسبوك
+# الروابط الرسمية المعتمدة فقط
 WHATSAPP_GROUP = "https://chat.whatsapp.com/DzsReO7OkJ9HoMJ2nZRkn5?s=cl&p=a&mlu=4&ilr=4"
 WHATSAPP_CHANNEL = "https://whatsapp.com/channel/0029VbEK4Yl7DAWqW7ixlW03"
 TELEGRAM_CHANNEL = "https://t.me/+v0b4FUPcNRpjNzFk"
@@ -106,9 +106,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.message.reply_text(
             "✅ تم اختيار القسم بنجاح.\n"
-            "الرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5):"
-)
-async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            "الرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5)
+    :"
+            )
+        async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("⛔ هذا الأمر مخصص للمشرفين فقط.")
@@ -147,7 +148,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     text = update.message.text.strip()
     
-    # دعم العمل داخل الجروبات والمجموعات عند اختيار القسم مسبقاً
     if 'selected_section' in context.user_data:
         section = context.user_data['selected_section']
         
@@ -179,4 +179,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-      
+        
