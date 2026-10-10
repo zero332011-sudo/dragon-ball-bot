@@ -195,7 +195,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [
             [InlineKeyboardButton(f"🐉 الكلاسيكي ({c_classic})", callback_data="upload_sec_db_classic"), InlineKeyboardButton(f"⚡ زد ({c_z})", callback_data="upload_sec_db_z")],
-            [InlineKeyboardButton(f"⚔️ زد كاي ({c_kai})", callback_data="upload_sec_db_super"), InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super")],
+            [InlineKeyboardButton(f"⚔️ زد كاي ({c_kai})", callback_data="upload_sec_db_kai"), InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super")],
             [InlineKeyboardButton(f"🔥 سوبر 2 ({c_super2})", callback_data="upload_sec_db_super2"), InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="upload_sec_db_daima")],
             [InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="upload_sec_db_heroes"), InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="upload_sec_db_gt")],
             [InlineKeyboardButton(f"⭐ الحلقات الخاصة ({c_specials})", callback_data="upload_sec_db_specials"), InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="upload_sec_db_movies")],
@@ -208,11 +208,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             return
         section_code = data.replace("upload_sec_", "")
-        context.user_data['admin_upload_section'] = section_code
+        # نخزن القسم في الذاكرة لفترة طويلة نسبياً للأدمن
+        context.bot_data[f'admin_sec_{user_id}'] = section_code
         
         await query.message.reply_text(
             f"✅ تم اختيار القسم بنجاح.\n\n"
-            "الآن يمكنك **إرسال حلقة واحدة أو عدة حلقات دفعة واحدة** وسيقوم البوت بحفظها تلقائياً بالترتيب! 🚀"
+            "الآن **أرسل الحلقات مباشرة في الشات** (فيديو أو مجموعة فيديوهات معاً)، وسيتم حفظها تلقائياً حسب أرقامها (مثل 9.mp4) دون الحاجة لأي رد أو منشن! 🚀"
         )
         return
 
@@ -314,41 +315,25 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg)
         return
 
-    if is_admin(user_id) and 'admin_upload_section' in context.user_data:
-        section = context.user_data.get('admin_upload_section')
+    # التخزين التلقائي للفيديوهات المرسلة إذا كان الأدمن قد اختار قسماً مسبقاً
+    if is_admin(user_id) and f'admin_sec_{user_id}' in context.bot_data and update.message.video:
+        section = context.bot_data[f'admin_sec_{user_id}']
+        video = update.message.video
+        file_id = video.file_id
+        caption = update.message.caption or video.file_name or ""
         
-        # دعم الفيديو الفردي أو رسائل الألبومات المتعددة
-        videos = []
-        if update.message.video:
-            videos.append(update.message)
-        elif update.message.media_group_id:
-            # إذا أرسل مجموعة فيديوهات معاً (مطلوب حفظها في نفس السياق)
-            pass
-        
-        # التحقق من الرد على رسالة تحتوي على فيديو أو إرسال مباشر بعد اختيار القسم
-        target_message = update.message
-        if update.message.reply_to_message and update.message.reply_to_message.video:
-            target_message = update.message.reply_to_message
-
-        if target_message.video:
-            file_id = target_message.video.file_id
-            caption = target_message.caption or target_message.video.file_name or ""
-            
-            numbers = re.findall(r'\d+', caption)
-            if numbers:
-                ep_number = numbers[0]
-                # تحقق من عدم تكرار الحلقة لنفس القسم
-                cursor.execute("SELECT id FROM episodes WHERE section = ? AND ep_number = ?", (section, ep_number))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
-                    conn.commit()
-                    await update.message.reply_text(f"✨ تم حفظ الحلقة رقم ({ep_number}) في القسم بنجاح دائم!")
-                else:
-                    await update.message.reply_text(f"⚠️ الحلقة رقم ({صر:=ep_number}) موجودة مسبقاً في هذا القسم.")
+        numbers = re.findall(r'\d+', caption)
+        if numbers:
+            ep_number = numbers[0]
+            cursor.execute("SELECT id FROM episodes WHERE section = ? AND ep_number = ?", (section, ep_number))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
+                conn.commit()
+                await update.message.reply_text(f"✅ تم حفظ الحلقة ({ep_number}) في القسم تلقائياً!")
             else:
-                await update.message.reply_text("عذراً، لم أتمكن من العثور على رقم الحلقة في اسم الفيديو أو الوصف. يجدر أن يحتوي الوصف على رقم الحلقة. 🌸")
+                await update.message.reply_text(f"⚠️ الحلقة ({ep_number}) موجودة مسبقاً.")
         else:
-            await update.message.reply_text("⚠️ يرجى إرسال أو الرد على رسالة فيديو لكي يتم حفظه في القسم المحدد.")
+            await update.message.reply_text("⚠️ لم يتم العثور على رقم في اسم أو وصف الفيديو لكي يتم حفظه تلقائياً.")
         return
 
     if not update.message.text:
@@ -401,3 +386,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+        
