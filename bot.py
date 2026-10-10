@@ -25,12 +25,12 @@ CREATE TABLE IF NOT EXISTS settings (
 ''')
 conn.commit()
 
-# الروابط الافتراضية وحالة الاشتراك
+# إعداد الروابط الافتراضية وحالة الاشتراك (رابط التليجرام الخاص بك)
 default_links = {
     "telegram": "https://t.me/+v0b4FUPcNRpjNzFk",
-    "wa_channel": "https://whatsapp.com/channel/0029VbEK4Yl7DAWqW7ixlW03",
-    "wa_group": "https://chat.whatsapp.com/Idyn2kKBqrm1PFeWqv8XmL?s=cl&p=a&mlu=4&ilr=4",
-    "fb_group": "https://www.facebook.com/share/g/1CKJ1y9rxS/",
+    "wa_channel": "",
+    "wa_group": "",
+    "fb_group": "",
     "force_sub": "on"
 }
 
@@ -53,11 +53,10 @@ ADMIN_IDS = [7080361795]
 def is_admin(user_id):
     return user_id in ADMIN_IDS
 
-# دالة لإنشاء أزرار الاشتراك بناءً على الروابط المتاحة فقط
+# دالة لإنشاء أزرار الاشتراك بناءً على الروابط المتاحة
 def get_subscription_keyboard():
     keyboard = []
     
-    # أسماء الأزرار وأنواعها
     link_mapping = [
         ("telegram", "📢 قناة التليجرام"),
         ("wa_channel", "💬 قناة الواتساب"),
@@ -67,11 +66,9 @@ def get_subscription_keyboard():
     
     for key, text in link_mapping:
         link_val = get_setting(key)
-        # إذا كان الرابط موجوداً وغير فارغ، أضف الزر تلقائياً
         if link_val and link_val.strip() != "":
             keyboard.append([InlineKeyboardButton(text, url=link_val)])
             
-    # زر التحقق الثابت في النهاية
     keyboard.append([InlineKeyboardButton("🔄 تحقق من الاشتراك", callback_data="check_sub")])
     return InlineKeyboardMarkup(keyboard)
 
@@ -83,7 +80,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = get_subscription_keyboard()
         await update.message.reply_text(
             "أهلاً بك يا غالي! 😊\n"
-            "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى قنواتنا وجروباتنا أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
+            "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى قناتنا أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
             reply_markup=reply_markup
         )
         return
@@ -137,35 +134,6 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     await update.message.reply_text(admin_text, reply_markup=reply_markup)
 
-async def set_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        await update.message.reply_text("عذراً، هذا الأمر للمشرفين فقط. 🌸")
-        return
-
-    args = context.args
-    if len(args) < 2:
-        await update.message.reply_text(
-            "الاستخدام الصحيح:\n"
-            "/set_link telegram [الرابط]\n"
-            "(أو أضف أي رابط أو اتركه فارغاً كـ /set_link telegram empty)"
-        )
-        return
-
-    link_type = args[0]
-    new_link = " ".join(args[1:])
-    
-    if new_link.lower() == "empty" or new_link.lower() == "none":
-        new_link = ""
-
-    valid_types = ["telegram", "wa_channel", "wa_group", "fb_group"]
-    if link_type not in valid_types:
-        await update.message.reply_text("عذراً، نوع الرابط غير صحيح. الأنواع المتاحة: telegram, wa_channel, wa_group, fb_group")
-        return
-
-    update_setting(link_type, new_link)
-    await update.message.reply_text(f"تم تحديث رابط ({link_type}) بنجاح! ✨")
-
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -202,7 +170,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🌐 تعديل جروب الفيسبوك", callback_data="edit_link_fb_group")],
             [InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")]
         ]
-        await query.message.edit_text("🔗 **اختر الرابط الذي تريد تعديله (أو إفراغه):**", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.edit_text("🔗 **اختر المنصة التي تريد وضع رابطها الخارجي:**", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     elif data.startswith("edit_link_"):
@@ -211,16 +179,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link_type = data.replace("edit_link_", "")
         context.user_data['waiting_for_link'] = link_type
         
-        link_names = {
-            "telegram": "قناة التليجرام",
-            "wa_channel": "قناة الواتساب",
-            "wa_group": "جروب الواتساب",
-            "fb_group": "جروب الفيسبوك"
-        }
-        
         await query.message.reply_text(
-            f"أرسل الآن الرابط الجديد لـ ({link_names.get(link_type, link_type)}):\n"
-            "*(ملاحظة: إذا أردت إزالة هذا الزر نهائياً وعدم عرضه، أرسل كلمة `حذف` أو `empty`)*"
+            "أرسل الآن الرابط الخارجي الجديد في رسالة:\n"
+            "*(ملاحظة: إذا أردت حذف الرابط وعدم إظهار الزر نهائياً، أرسل كلمة `حذف`)*"
         )
         return
 
@@ -231,7 +192,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "➕ **طريقة إضافة حلقات جديدة بكل سهولة:**\n\n"
             "فقط قم بكتابة هذا الأمر مع اسم القسم:\n"
             "`/upload [اسم_القسم]`\n"
-            "ثم **قم بالرد على فيديو الحلقة** مباشرة.\n\n"
+            "ثم **قم بالرد على فيديو الحلقة** مباشرة وسيتم حفظها بشكل دائم ولن تُحذف أبداً.\n\n"
             "📁 **أسماء الأقسام:**\n"
             "`db_classic`, `db_z`, `db_kai`, `db_super`, `db_super2`, `db_daima`, `db_heroes`, `db_gt`, `db_specials`, `db_movies`"
         )
@@ -263,7 +224,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("لا توجد أي حلقات مرفوعة حتى الآن يا غالي. 🌸")
             return
             
-        result_msg = "📋 **قائمة الحلقات المضافة:**\n\n"
+        result_msg = "📋 **قائمة الحلقات المحفوظة دائمًا:**\n\n"
         current_section = ""
         for section, ep_number in rows:
             if section != current_section:
@@ -298,7 +259,7 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     args = context.args
     if len(args) < 1:
-        await update.message.reply_text("الاستخدام الصحيح:\nأرسل الأمر هكذا: `/upload db_z` ثم رد على الفيديو المراد حفظه.")
+        await update.message.reply_text("الاستخدام الصحيح:\nأرسل الأمر هكذا: `/upload db_z` ثم رد على الفيديو المراد حفظه بشكل دائم.")
         return
     
     section = args[0]
@@ -315,13 +276,13 @@ async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ep_number = numbers[0]
                 cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
                 conn.commit()
-                await update.message.reply_text(f"تم حفظ الحلقة رقم ({ep_number}) في القسم ({section}) بنجاح تام! ✨")
+                await update.message.reply_text(f"تم حفظ الحلقة رقم ({ep_number}) في القسم ({section}) بشكل دائم ولن تُحذف أبدًا! ✨")
             else:
                 await update.message.reply_text("عذراً، لم أتمكن من العثور على رقم الحلقة في اسم الفيديو أو الوصف. تأكد من وجود رقمه في الوصف. 🌸")
         else:
             await update.message.reply_text("الرسالة التي رددت عليها ليست فيديو يا غالي. ⚠️")
     else:
-        await update.message.reply_text("الرجاء الرد على رسالة الفيديو بالأمر الصحيح `/upload [اسم_القسم]` لحفظه.")
+        await update.message.reply_text("الرجاء الرد على رسالة الفيديو بالأمر الصحيح `/upload [اسم_القسم]` لحفظه بشكل دائم.")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
@@ -330,16 +291,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.strip()
 
-    # استقبال الرابط الجديد من الأدمن
+    # استقبال الرابط الخارجي الجديد من الأدمن
     if is_admin(user_id) and 'waiting_for_link' in context.user_data:
         link_type = context.user_data.pop('waiting_for_link')
         
         if text.lower() in ["حذف", "empty", "none", "-"]:
             new_link = ""
-            msg = f"تم إزالة الزر وإفراغ رابط ({link_type}) بنجاح! ✨"
+            msg = "تم إزالة الرابط وإخفاء الزر بنجاح! ✨"
         else:
             new_link = text
-            msg = f"تم تحديث رابط ({link_type}) بنجاح! 🚀"
+            msg = f"تم حفظ الرابط الخارجي الجديد بنجاح! 🚀"
             
         update_setting(link_type, new_link)
         await update.message.reply_text(msg)
@@ -350,8 +311,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if force_sub_status == "on" and not is_admin(user_id):
         reply_markup = get_subscription_keyboard()
         await update.message.reply_text(
-            "عذراً يا غالي، يجب عليك الانضمام إلى قنواتنا وجروباتنا أولاً لاستخدام البوت:\n\n"
-            "بعد الانضمام، اضغط على زر (تحقق من الاشتراك):",
+            "أهلاً بك يا غالي! 😊\n"
+            "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى قناتنا أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
             reply_markup=reply_markup
         )
         return
@@ -379,7 +340,6 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin_panel))
-    app.add_handler(CommandHandler("set_link", set_link))
     app.add_handler(CommandHandler("upload", upload_episode))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
@@ -389,4 +349,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-        
