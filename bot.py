@@ -3,11 +3,11 @@ import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 
-# الاتصال بقاعدة البيانات وحفظها بشكل دائم
+# الاتصال بقاعدة البيانات الخارجية database.db
 conn = sqlite3.connect('database.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء جداول الحلقات والروابط إذا لم تكن موجودة
+# التأكد من وجود الجداول المطلوبة
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS episodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,13 +25,13 @@ CREATE TABLE IF NOT EXISTS settings (
 ''')
 conn.commit()
 
-# إعداد الروابط الافتراضية لأول مرة إذا لم تكن مخزنة
+# الروابط الافتراضية
 default_links = {
     "telegram": "https://t.me/+v0b4FUPcNRpjNzFk",
     "wa_channel": "https://whatsapp.com/channel/0029VbEK4Yl7DAWqW7ixlW03",
     "wa_group": "https://chat.whatsapp.com/DzsReO7OkJ9HoMJ2nZRkn5?s=cl&p=a&mlu=4&ilr=4",
     "fb_group": "https://www.facebook.com/share/g/1CKJ1y9rxS/",
-    "force_sub": "on"  # الحالة الافتراضية لتفعيل الاشتراك
+    "force_sub": "on"
 }
 
 for key, val in default_links.items():
@@ -47,7 +47,6 @@ def update_setting(key, value):
     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
 
-# أرقام المشرفين المسموح لهم بالرفع وإدارة البوت
 ADMIN_IDS = [7080361795]
 
 def is_admin(user_id):
@@ -81,7 +80,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_main_menu(update)
 
 async def show_main_menu(update: Update):
-    # ترتيب الأزرار بجانب بعضها بشكل منظم واحترافي
     keyboard = [
         [InlineKeyboardButton("🐉 الكلاسيكي", callback_data="db_classic"), InlineKeyboardButton("⚡ دراغون بول زد", callback_data="db_z")],
         [InlineKeyboardButton("⚔️ زد كاي", callback_data="db_kai"), InlineKeyboardButton("🔥 سوبر", callback_data="db_super")],
@@ -124,8 +122,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🎛️ لوحة تحكم المطور والأدمن:\n\n"
         "• يمكنك تفعيل أو إيقاف الاشتراك الإجباري من الأزرار أدناه.\n"
         "• يمكنك عرض الحلقات ونسخها للنشر.\n\n"
-        "🔗 **تحديث الروابط من داخل البوت (بدون تعديل الكود):**\n"
-        "أرسل هذه الأامر لأي تحديث:\n"
+        "🔗 **تحديث الروابط من داخل البوت:**\n"
         "• لتحديث تليجرام: `/set_link telegram [الرابط]`\n"
         "• لتحديث قناة واتساب: `/set_link wa_channel [الرابط]`\n"
         "• لتحديث جروب واتساب: `/set_link wa_group [الرابط]`\n"
@@ -218,8 +215,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ تم اختيار القسم بنجاح.\n"
         "الرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5):"
     )
-
-async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def upload_episode(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("⛔ هذا الأمر مخصص للمشرفين فقط.")
@@ -315,4 +311,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-            
+    
