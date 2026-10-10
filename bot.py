@@ -124,7 +124,8 @@ async def show_main_menu(update: Update):
         except Exception:
             pass
         await update.callback_query.message.reply_text(welcome_text, reply_markup=reply_markup)
-    async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("عذراً، هذا الأمر مخصص للمشرفين فقط. 🌸")
@@ -180,7 +181,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             return
         
-        # جلب عدد الحلقات لكل قسم لعرضها بجانب الزر
         c_classic = get_section_count("db_classic")
         c_z = get_section_count("db_z")
         c_kai = get_section_count("db_kai")
@@ -345,7 +345,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup = get_subscription_keyboard()
         await update.message.reply_text(
             "أهلاً بك يا غالي! 😊\n"
-            "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى النوات والروابط أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
+            "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى القنوات والروابط أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
             reply_markup=reply_markup
         )
         return
@@ -380,6 +380,5 @@ def main():
     app.run_polling()
 
 if __name__ == '__main__':
-    main()    
-
+    main()
     
