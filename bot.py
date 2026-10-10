@@ -208,12 +208,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             return
         section_code = data.replace("upload_sec_", "")
-        # نخزن القسم في الذاكرة لفترة طويلة نسبياً للأدمن
         context.bot_data[f'admin_sec_{user_id}'] = section_code
         
         await query.message.reply_text(
             f"✅ تم اختيار القسم بنجاح.\n\n"
-            "الآن **أرسل الحلقات مباشرة في الشات** (فيديو أو مجموعة فيديوهات معاً)، وسيتم حفظها تلقائياً حسب أرقامها (مثل 9.mp4) دون الحاجة لأي رد أو منشن! 🚀"
+            "الآن **أرسل الحلقات مباشرة (كفيديوهات أو ملفات)** وسيقوم البوت بحفظها تلقائياً حسب أرقامها دون الحاجة لأي رد أو منشن! 🚀"
         )
         return
 
@@ -315,26 +314,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg)
         return
 
-    # التخزين التلقائي للفيديوهات المرسلة إذا كان الأدمن قد اختار قسماً مسبقاً
-    if is_admin(user_id) and f'admin_sec_{user_id}' in context.bot_data and update.message.video:
-        section = context.bot_data[f'admin_sec_{user_id}']
-        video = update.message.video
-        file_id = video.file_id
-        caption = update.message.caption or video.file_name or ""
-        
-        numbers = re.findall(r'\d+', caption)
-        if numbers:
-            ep_number = numbers[0]
-            cursor.execute("SELECT id FROM episodes WHERE section = ? AND ep_number = ?", (section, ep_number))
-            if not cursor.fetchone():
-                cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
-                conn.commit()
-                await update.message.reply_text(f"✅ تم حفظ الحلقة ({ep_number}) في القسم تلقائياً!")
+    # التخزين التلقائي سواء كانت فيديوهات أو ملفات (Documents)
+    if is_admin(user_id) and f'admin_sec_{user_id}' in context.bot_data:
+        media_file = None
+        if update.message.video:
+            media_file = update.message.video
+        elif update.message.document:
+            media_file = update.message.document
+
+        if media_file:
+            section = context.bot_data[f'admin_sec_{user_id}']
+            file_id = media_file.file_id
+            caption = update.message.caption or media_file.file_name or ""
+            
+            numbers = re.findall(r'\d+', caption)
+            if numbers:
+                ep_number = numbers[0]
+                cursor.execute("SELECT id FROM episodes WHERE section = ? AND ep_number = ?", (section, ep_number))
+                if not cursor.fetchone():
+                    cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
+                    conn.commit()
+                    await update.message.reply_text(f"✅ تم حفظ الحلقة ({ep_number}) في القسم بنجاح!")
+                else:
+                    await update.message.reply_text(f"⚠️ الحلقة ({ep_number}) موجودة مسبقاً في هذا القسم.")
             else:
-                await update.message.reply_text(f"⚠️ الحلقة ({ep_number}) موجودة مسبقاً.")
-        else:
-            await update.message.reply_text("⚠️ لم يتم العثور على رقم في اسم أو وصف الفيديو لكي يتم حفظه تلقائياً.")
-        return
+                await update.message.reply_text("⚠️ لم يتم العثور على رقم في اسم الملف أو الوصف لكي يتم حفظه تلقائياً.")
+            return
 
     if not update.message.text:
         return
@@ -386,4 +391,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-        
+            
