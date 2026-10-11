@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 conn = sqlite3.connect('database.db', check_same_thread=False)
 cursor = conn.cursor()
 
-# إنشاء جداول الحلقات والإعدادات إذا لم تكن موجودة
+# إنشاء جداول الحلقات والإعدادات والمطورين إذا لم تكن موجودة
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS episodes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,9 +23,20 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT
 )
 ''')
+
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS admins (
+    user_id INTEGER PRIMARY KEY
+)
+''')
 conn.commit()
 
-# إعداد الروابط فارغة تماماً لكي تختار وتضيف ما تحتاجه بنفسك لاحقاً
+# إضافة المطور الأساسي تلقائياً (الآي دي الخاص بك)
+DEFAULT_ADMIN = 7080361795
+cursor.execute("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (DEFAULT_ADMIN,))
+conn.commit()
+
+# إعداد الروابط الافتراضية
 default_links = {
     "telegram_1": "",
     "telegram_2": "",
@@ -51,11 +62,9 @@ def update_setting(key, value):
     cursor.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value))
     conn.commit()
 
-# أرقام المشرفين المسموح لهم بإدارة البوت
-ADMIN_IDS = [7080361795]
-
 def is_admin(user_id):
-    return user_id in ADMIN_IDS
+    cursor.execute("SELECT user_id FROM admins WHERE user_id = ?", (user_id,))
+    return cursor.fetchone() is not None
 
 def get_section_count(section_code):
     cursor.execute("SELECT COUNT(*) FROM episodes WHERE section = ?", (section_code,))
@@ -64,7 +73,6 @@ def get_section_count(section_code):
 
 def get_subscription_keyboard():
     keyboard = []
-    
     link_mapping = [
         ("telegram_1", "📢 قناة التليجرام 1"),
         ("telegram_2", "📢 قناة التليجرام 2"),
@@ -75,12 +83,10 @@ def get_subscription_keyboard():
         ("youtube_1", "📺 قناة اليوتيوب 1"),
         ("youtube_2", "📺 قناة اليوتيوب 2"),
     ]
-    
     for key, text in link_mapping:
         link_val = get_setting(key)
         if link_val and link_val.strip() != "":
             keyboard.append([InlineKeyboardButton(text, url=link_val)])
-            
     keyboard.append([InlineKeyboardButton("🔄 تحقق من الاشتراك", callback_data="check_sub")])
     return InlineKeyboardMarkup(keyboard)
 
@@ -93,31 +99,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(reply_markup.inline_keyboard) == 1:
             await show_main_menu(update)
             return
-            
         await update.message.reply_text(
             "أهلاً بك يا غالي! 😊\n"
             "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى القنوات والروابط أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
             reply_markup=reply_markup
         )
         return
-
     await show_main_menu(update)
 
 async def show_main_menu(update: Update):
     keyboard = [
         [InlineKeyboardButton("🐉 الكلاسيكي", callback_data="db_classic"), InlineKeyboardButton("⚡ دراغون بول زد", callback_data="db_z")],
-        [InlineKeyboardButton("⚔️ زد كاي", callback_data="db_kai"), InlineKeyboardButton("🔥 سوبر", callback_data="db_super")],
-        [InlineKeyboardButton("🔥 سوبر 2", callback_data="db_super2"), InlineKeyboardButton("✨ دايما", callback_data="db_daima")],
-        [InlineKeyboardButton("💫 هيروز", callback_data="db_heroes"), InlineKeyboardButton("🌀 جي تي", callback_data="db_gt")],
-        [InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials"), InlineKeyboardButton("🎬 الأفلام", callback_data="db_movies")]
+        [InlineKeyboardButton("⚔️ زد كاي", callback_data="db_kai"), InlineKeyboardButton("⚔️ زد كاي 2", callback_data="db_kai2")],
+        [InlineKeyboardButton("🔥 سوبر", callback_data="db_super"), InlineKeyboardButton("✨ سوبر ريمك", callback_data="db_super_remake")],
+        [InlineKeyboardButton("✨ دايما", callback_data="db_daima"), InlineKeyboardButton("💫 هيروز", callback_data="db_heroes")],
+        [InlineKeyboardButton("🌀 جي تي", callback_data="db_gt"), InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials")],
+        [InlineKeyboardButton("🎬 الأفلام", callback_data="db_movies")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    
     welcome_text = (
         "مرحباً بك في بوت أنمي دراغون بول الرسمي! 🌟\n"
         "اختر القسم المطلوب من الأزرار بالأسفل لتصفح الحلقات بكل سهولة:"
     )
-    
     if update.message:
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
     elif update.callback_query:
@@ -139,21 +142,17 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
         [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+        [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
         [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
         [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-
-    admin_text = (
-        "🎛️ أهلاً بك في لوحة تحكم الأدمن المباشرة:\n\n"
-        "اختر ما تريد فعله من الأزرار بالأسفل:"
-    )
+    admin_text = "🎛️ أهلاً بك في لوحة تحكم الأدمن المباشرة:\n\nاختر ما تريد فعله من الأزرار بالأسفل:"
     await update.message.reply_text(admin_text, reply_markup=reply_markup)
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     data = query.data
     user_id = query.from_user.id
     
@@ -163,30 +162,38 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         current_status = get_setting("force_sub")
         new_status = "off" if current_status == "on" else "on"
         update_setting("force_sub", new_status)
-        
-        status_text = "🟢 مفعل" if new_status == "on" else "🔴 معطل"
-        force_sub_status = get_setting("force_sub")
-        status_txt = "🟢 مفعل" if force_sub_status == "on" else "🔴 معطل"
+        status_txt = "🟢 مفعل" if new_status == "on" else "🔴 معطل"
         
         keyboard = [
             [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_txt}", callback_data="toggle_sub")],
             [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+            [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
             [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
             [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
         ]
         await query.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
-        await query.message.reply_text(f"تم تغيير حالة الاشتراك الإجباري لتصبح: {status_text} 👍")
+        await query.message.reply_text(f"تم تغيير حالة الاشتراك الإجباري لتصبح: {status_txt} 👍")
+        return
+
+    elif data == "add_admin_prompt":
+        if not is_admin(user_id):
+            return
+        context.user_data['waiting_for_new_admin'] = True
+        await query.message.reply_text(
+            "👤 **إضافة مطور أو متحكم جديد:**\n\n"
+            "أرسل الآن (آي دي / ID) الشخص المراد إضافته كأدمن في رسالة جديدة:"
+        )
         return
 
     elif data == "admin_sections_menu":
         if not is_admin(user_id):
             return
-        
         c_classic = get_section_count("db_classic")
         c_z = get_section_count("db_z")
         c_kai = get_section_count("db_kai")
+        c_kai2 = get_section_count("db_kai2")
         c_super = get_section_count("db_super")
-        c_super2 = get_section_count("db_super2")
+        c_super_remake = get_section_count("db_super_remake")
         c_daima = get_section_count("db_daima")
         c_heroes = get_section_count("db_heroes")
         c_gt = get_section_count("db_gt")
@@ -195,13 +202,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = [
             [InlineKeyboardButton(f"🐉 الكلاسيكي ({c_classic})", callback_data="upload_sec_db_classic"), InlineKeyboardButton(f"⚡ زد ({c_z})", callback_data="upload_sec_db_z")],
-            [InlineKeyboardButton(f"⚔️ زد كاي ({c_kai})", callback_data="upload_sec_db_kai"), InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super")],
-            [InlineKeyboardButton(f"🔥 سوبر 2 ({c_super2})", callback_data="upload_sec_db_super2"), InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="upload_sec_db_daima")],
-            [InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="upload_sec_db_heroes"), InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="upload_sec_db_gt")],
-            [InlineKeyboardButton(f"⭐ الحلقات الخاصة ({c_specials})", callback_data="upload_sec_db_specials"), InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="upload_sec_db_movies")],
+            [InlineKeyboardButton(f"⚔️ زد كاي ({c_kai})", callback_data="upload_sec_db_kai"), InlineKeyboardButton(f"⚔️ زد كاي 2 ({c_kai2})", callback_data="upload_sec_db_kai2")],
+            [InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super"), InlineKeyboardButton(f"✨ سوبر ريمك ({c_super_remake})", callback_data="upload_sec_db_super_remake")],
+            [InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="upload_sec_db_daima"), InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="upload_sec_db_heroes")],
+            [InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="upload_sec_db_gt"), InlineKeyboardButton(f"⭐ الخاصة ({c_specials})", callback_data="upload_sec_db_specials")],
+            [InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="upload_sec_db_movies")],
             [InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")]
         ]
-        await query.message.edit_text("📂 **اختر القسم الذي تريد إضافة حلقات إليه (يظهر عدد الحلقات بجانبه):**", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.edit_text("📂 **اختر القسم الذي تريد إضافة حلقات إليه:**", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     elif data.startswith("upload_sec_"):
@@ -209,10 +217,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         section_code = data.replace("upload_sec_", "")
         context.bot_data[f'admin_sec_{user_id}'] = section_code
-        
         await query.message.reply_text(
-            f"✅ تم اختيار القسم بنجاح.\n\n"
-            "الآن **أرسل الحلقات مباشرة (كفيديوهات أو ملفات)** وسيقوم البوت بحفظها تلقائياً حسب أرقامها دون الحاجة لأي رد أو منشن! 🚀"
+            "✅ تم اختيار القسم بنجاح.\n\n"
+            "الآن **أرسل الحلقات مباشرة (كفيديوهات أو ملفات)** وسيقوم البوت بحفظها تلقائياً حسب أرقامها! 🚀"
         )
         return
 
@@ -226,7 +233,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📺 يوتيوب 1", callback_data="edit_link_youtube_1"), InlineKeyboardButton("📺 يوتيوب 2", callback_data="edit_link_youtube_2")],
             [InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")]
         ]
-        await query.message.edit_text("🔗 **اختر الرابط الذي تريد تعديله أو إضافته:**", reply_markup=InlineKeyboardMarkup(keyboard))
+        await query.message.edit_text("🔗 **اختر الرابط الذي تريد تعديله:**", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     elif data.startswith("edit_link_"):
@@ -234,11 +241,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         link_type = data.replace("edit_link_", "")
         context.user_data['waiting_for_link'] = link_type
-        
-        await query.message.reply_text(
-            f"أرسل الآن الرابط الجديد لـ ({link_type}) في رسالة:\n"
-            "*(ملاحظة: إذا أردت حذف الرابط وإخفاء الزر، أرسل كلمة `حذف`)*"
-        )
+        await query.message.reply_text(f"أرسل الآن الرابط الجديد لـ ({link_type}) في رسالة:\n*(أرسل `حذف` لإزالته)*")
         return
 
     elif data == "back_to_admin":
@@ -246,10 +249,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         force_sub_status = get_setting("force_sub")
         status_text = "🟢 مفعل" if force_sub_status == "on" else "🔴 معطل"
-        
         keyboard = [
             [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
             [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+            [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
             [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
             [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
         ]
@@ -261,11 +264,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         cursor.execute("SELECT section, ep_number FROM episodes ORDER BY section, CAST(ep_number AS INTEGER)")
         rows = cursor.fetchall()
-        
         if not rows:
             await query.message.reply_text("لا توجد أي حلقات مرفوعة حتى الآن يا غالي. 🌸")
             return
-            
         result_msg = "📋 **قائمة الحلقات المحفوظة دائمًا:**\n\n"
         current_section = ""
         for section, ep_number in rows:
@@ -273,7 +274,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 current_section = section
                 result_msg += f"\n📂 **القسم: `{section}`**\n"
             result_msg += f"• الحلقة: `{ep_number}`\n"
-            
         if len(result_msg) > 4000:
             for i in range(0, len(result_msg), 4000):
                 await query.message.reply_text(result_msg[i:i+4000], parse_mode="Markdown")
@@ -287,46 +287,41 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     section = data
     context.user_data['selected_section'] = section
-    
-    await query.message.reply_text(
-        "تم اختيار القسم بنجاح! 🎯\n"
-        "الرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5):"
-    )
+    await query.message.reply_text("تم اختيار القسم بنجاح! 🎯\nالرجاء إرسال رقم الحلقة المطلوبة الآن (مثال: 1 أو 5):")
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-        
     user_id = update.effective_user.id
+
+    # إضافة مطور جديد
+    if is_admin(user_id) and context.user_data.get('waiting_for_new_admin') and update.message.text:
+        text = update.message.text.strip()
+        context.user_data.pop('waiting_for_new_admin', None)
+        if text.isdigit():
+            new_admin_id = int(text)
+            cursor.execute("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (new_admin_id,))
+            conn.commit()
+            await update.message.reply_text(f"✅ تم إضافة الآي دي ({new_admin_id}) كمطور/متحكم جديد بنجاح! 🚀")
+        else:
+            await update.message.reply_text("⚠️ يرجى إرسال رقم الآي دي صحيحاً ومكوناً من أرقام فقط.")
+        return
 
     if is_admin(user_id) and 'waiting_for_link' in context.user_data and update.message.text:
         text = update.message.text.strip()
         link_type = context.user_data.pop('waiting_for_link')
-        
-        if text.lower() in ["حذف", "empty", "none", "-"]:
-            new_link = ""
-            msg = f"تم إزالة رابط ({link_type}) وإخفاء زره بنجاح! ✨"
-        else:
-            new_link = text
-            msg = f"تم حفظ رابط ({link_type}) بنجاح! 🚀"
-            
+        new_link = "" if text.lower() in ["حذف", "empty", "none", "-"] else text
         update_setting(link_type, new_link)
-        await update.message.reply_text(msg)
+        await update.message.reply_text(f"تم تحديث رابط ({link_type}) بنجاح! 🚀")
         return
 
-    # التخزين التلقائي سواء كانت فيديوهات أو ملفات (Documents)
+    # التخزين التلقائي للفيديوهات والملفات المرسلة بعد اختيار القسم
     if is_admin(user_id) and f'admin_sec_{user_id}' in context.bot_data:
-        media_file = None
-        if update.message.video:
-            media_file = update.message.video
-        elif update.message.document:
-            media_file = update.message.document
-
+        media_file = update.message.video or update.message.document
         if media_file:
             section = context.bot_data[f'admin_sec_{user_id}']
             file_id = media_file.file_id
             caption = update.message.caption or media_file.file_name or ""
-            
             numbers = re.findall(r'\d+', caption)
             if numbers:
                 ep_number = numbers[0]
@@ -334,11 +329,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if not cursor.fetchone():
                     cursor.execute("INSERT INTO episodes (section, ep_number, file_id) VALUES (?, ?, ?)", (section, ep_number, file_id))
                     conn.commit()
-                    await update.message.reply_text(f"✅ تم حفظ الحلقة ({ep_number}) في القسم بنجاح!")
+                    await update.message.reply_text(f"✅ تم حفظ الحلقة ({ep_number}) في القسم تلقائياً!")
                 else:
-                    await update.message.reply_text(f"⚠️ الحلقة ({ep_number}) موجودة مسبقاً في هذا القسم.")
+                    await update.message.reply_text(f"⚠️ الحلقة ({ep_number}) موجودة مسبقاً.")
             else:
-                await update.message.reply_text("⚠️ لم يتم العثور على رقم في اسم الملف أو الوصف لكي يتم حفظه تلقائياً.")
+                await update.message.reply_text("⚠️ لم يتم العثور على رقم في اسم أو وصف الملف لكي يتم حفظه تلقائياً.")
             return
 
     if not update.message.text:
@@ -352,7 +347,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(reply_markup.inline_keyboard) == 1:
             await show_main_menu(update)
             return
-            
         await update.message.reply_text(
             "أهلاً بك يا غالي! 😊\n"
             "للاستمرار واستخدام البوت، نرجو منك الانضمام إلى القنوات والروابط أولاً، ثم اضغط على زر (تحقق من الاشتراك):",
@@ -362,10 +356,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if 'selected_section' in context.user_data:
         section = context.user_data['selected_section']
-        
         cursor.execute("SELECT file_id FROM episodes WHERE section = ? AND ep_number = ?", (section, text))
         row = cursor.fetchone()
-        
         if row:
             file_id = row[0]
             await update.message.reply_video(video=file_id, caption=f"🎬 الحلقة رقم ({text})")
@@ -378,7 +370,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     TOKEN = "8911756458:AAEADtUnJ5pYSv5SshjjXuMUd4GA9TnAMYY"
-    
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -391,4 +382,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-            
+                                                                                        
