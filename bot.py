@@ -31,12 +31,12 @@ CREATE TABLE IF NOT EXISTS admins (
 ''')
 conn.commit()
 
-# إضافة المطور الأساسي تلقائياً (الآي دي الخاص بك)
+# إضافة المطور الأساسي تلقائياً
 DEFAULT_ADMIN = 7080361795
 cursor.execute("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (DEFAULT_ADMIN,))
 conn.commit()
 
-# إعداد الروابط الافتراضية
+# إعداد الروابط الافتراضية فارغة
 default_links = {
     "telegram_1": "",
     "telegram_2": "",
@@ -109,12 +109,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_main_menu(update: Update):
     keyboard = [
-        [InlineKeyboardButton("🐉 الكلاسيكي", callback_data="db_classic"), InlineKeyboardButton("⚡ دراغون بول زد", callback_data="db_z")],
-        [InlineKeyboardButton("⚔️ زد كاي", callback_data="db_kai"), InlineKeyboardButton("⚔️ زد كاي 2", callback_data="db_kai2")],
-        [InlineKeyboardButton("🔥 سوبر", callback_data="db_super"), InlineKeyboardButton("✨ سوبر ريمك", callback_data="db_super_remake")],
-        [InlineKeyboardButton("✨ دايما", callback_data="db_daima"), InlineKeyboardButton("💫 هيروز", callback_data="db_heroes")],
-        [InlineKeyboardButton("🌀 جي تي", callback_data="db_gt"), InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials")],
-        [InlineKeyboardButton("🎬 الأفلام", callback_data="db_movies")]
+        [InlineKeyboardButton("📂 --- القسم الأول (البداية حتى آرك سيل) ---", callback_data="none")],
+        [InlineKeyboardButton("🐉 الكلاسيكي (153)", callback_data="db_classic"), InlineKeyboardButton("⚡ كاي الأول (97)", callback_data="db_kai1")],
+        
+        [InlineKeyboardButton("📂 --- القسم الثاني (من ماجين بو وحتى النهاية) ---", callback_data="none")],
+        [InlineKeyboardButton("⚔️ زد كاي 2 (61)", callback_data="db_kai2"), InlineKeyboardButton("🔥 سوبر (131)", callback_data="db_super")],
+        [InlineKeyboardButton("🌀 جي تي (64)", callback_data="db_gt"), InlineKeyboardButton("✨ دايما (20)", callback_data="db_daima")],
+        [InlineKeyboardButton("💫 هيروز (56)", callback_data="db_heroes"), InlineKeyboardButton("✨ سوبر ريمك (20)", callback_data="db_super_remake")],
+        
+        [InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials"), InlineKeyboardButton("🎬 الأفلام (21)", callback_data="db_movies")],
+        [InlineKeyboardButton("📖 معلومات الأقسام والحلقات المتوفرة", callback_data="bot_info")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     welcome_text = (
@@ -156,6 +160,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = query.data
     user_id = query.from_user.id
     
+    if data == "none":
+        return
+
     if data == "toggle_sub":
         if not is_admin(user_id):
             return
@@ -175,6 +182,32 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(f"تم تغيير حالة الاشتراك الإجباري لتصبح: {status_txt} 👍")
         return
 
+    elif data == "bot_info":
+        sections = [
+            ("db_classic", "🐉 الكلاسيكي"),
+            ("db_kai1", "⚡ دراغون بول كاي - الجزء الأول"),
+            ("db_kai2", "⚔️ دراغون بول زد كاي - الجزء الثاني (الفصول الأخيرة)"),
+            ("db_super", "🔥 دراغون بول سوبر"),
+            ("db_gt", "🌀 دراغون بول جي تي"),
+            ("db_daima", "✨ دراغون بول دايما"),
+            ("db_heroes", "💫 سوبر دراغون بول هيروز"),
+            ("db_super_remake", "✨ سوبر ريمك"),
+            ("db_specials", "⭐ الحلقات الخاصة"),
+            ("db_movies", "🎬 الأفلام السينمائية")
+        ]
+        info_msg = "📖 **معلومات الأقسام وحالة الحلقات المتوفرة في البوت:**\n\n"
+        for code, name in sections:
+            cnt = get_section_count(code)
+            info_msg += f"• **{name}**: تم رفع `{cnt}` حلقة متوفرة ✅\n"
+        
+        keyboard = [[InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="back_to_main")]]
+        await query.message.edit_text(info_msg, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif data == "back_to_main":
+        await show_main_menu(update)
+        return
+
     elif data == "add_admin_prompt":
         if not is_admin(user_id):
             return
@@ -189,24 +222,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             return
         c_classic = get_section_count("db_classic")
-        c_z = get_section_count("db_z")
-        c_kai = get_section_count("db_kai")
+        c_kai1 = get_section_count("db_kai1")
         c_kai2 = get_section_count("db_kai2")
         c_super = get_section_count("db_super")
-        c_super_remake = get_section_count("db_super_remake")
+        c_gt = get_section_count("db_gt")
         c_daima = get_section_count("db_daima")
         c_heroes = get_section_count("db_heroes")
-        c_gt = get_section_count("db_gt")
+        c_super_remake = get_section_count("db_super_remake")
         c_specials = get_section_count("db_specials")
         c_movies = get_section_count("db_movies")
         
         keyboard = [
-            [InlineKeyboardButton(f"🐉 الكلاسيكي ({c_classic})", callback_data="upload_sec_db_classic"), InlineKeyboardButton(f"⚡ زد ({c_z})", callback_data="upload_sec_db_z")],
-            [InlineKeyboardButton(f"⚔️ زد كاي ({c_kai})", callback_data="upload_sec_db_kai"), InlineKeyboardButton(f"⚔️ زد كاي 2 ({c_kai2})", callback_data="upload_sec_db_kai2")],
-            [InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super"), InlineKeyboardButton(f"✨ سوبر ريمك ({c_super_remake})", callback_data="upload_sec_db_super_remake")],
-            [InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="upload_sec_db_daima"), InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="upload_sec_db_heroes")],
-            [InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="upload_sec_db_gt"), InlineKeyboardButton(f"⭐ الخاصة ({c_specials})", callback_data="upload_sec_db_specials")],
-            [InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="upload_sec_db_movies")],
+            [InlineKeyboardButton(f"🐉 الكلاسيكي ({c_classic})", callback_data="upload_sec_db_classic"), InlineKeyboardButton(f"⚡ كاي 1 ({c_kai1})", callback_data="upload_sec_db_kai1")],
+            [InlineKeyboardButton(f"⚔️ زد كاي 2 ({c_kai2})", callback_data="upload_sec_db_kai2"), InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="upload_sec_db_super")],
+            [InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="upload_sec_db_gt"), InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="upload_sec_db_daima")],
+            [InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="upload_sec_db_heroes"), InlineKeyboardButton(f"✨ ريمك ({c_super_remake})", callback_data="upload_sec_db_super_remake")],
+            [InlineKeyboardButton(f"⭐ الخاصة ({c_specials})", callback_data="upload_sec_db_specials"), InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="upload_sec_db_movies")],
             [InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")]
         ]
         await query.message.edit_text("📂 **اختر القسم الذي تريد إضافة حلقات إليه:**", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -360,9 +391,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         row = cursor.fetchone()
         if row:
             file_id = row[0]
-            await update.message.reply_video(video=file_id, caption=f"🎬 الحلقة رقم ({text})")
+            await update.message.reply_video(video=file_id, caption=f"🎬 الحلقة رقم ({text}) - متوفرة ✅")
         else:
-            await update.message.reply_text(f"عذراً، الحلقة رقم ({text}) غير متوفرة في هذا القسم حالياً. 🌸")
+            await update.message.reply_text(f"عذراً، الحلقة رقم ({text}) غير متوفرة في هذا القسم حالياً ❌. 🌸")
     else:
         if update.effective_chat.type in ["group", "supergroup"]:
             return
@@ -382,4 +413,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-                                                                                        
+                      
