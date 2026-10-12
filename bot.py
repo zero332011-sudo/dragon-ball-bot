@@ -184,7 +184,7 @@ TITLES_DB = {
         125: "الهجوم الأخير (The Final Challenge)",
         126: "نهاية الكلاسيكي وبداية الملحمة (The End of the Journey)"
     },
-        "db_kai1": {
+    "db_kai1": {
         1: "ظهور مقاتل جديد! هويّة غوكو المذهلة",
         2: "العدو هو شقيق غوكو الأكبر! حقيقة محاربي الفضاء السيانز",
         3: "النصر بالتحالف! أقوى رجلين في العالم يقاتلان معاً",
@@ -269,7 +269,7 @@ TITLES_DB = {
         82: "صراع كاميهااميها الأبدي! غوهان يطلق طاقته القصوى بمساعدة والده",
         83: "نهاية سيل الأبدية! سلام يعم الأرض من جديد"
     },
-        "db_kai2": {
+    "db_kai2": {
         1: "بعد سبع سنوات! غوهان يبدأ دراسته الثانوية كبطل خارق",
         2: "ظهور فتاة الغموض فيديل! اكتشاف هوية غريت سايامان",
         3: "التسجيل في بطولة العالم للمقاتلين! عودة غوكو المؤقتة من الآخرة",
@@ -474,7 +474,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(admin_text, reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.message.reply_text(admin_text, reply_markup=reply_markup)
-    async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -780,4 +780,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-    
+        
