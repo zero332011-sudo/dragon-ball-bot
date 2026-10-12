@@ -94,7 +94,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     force_sub_status = get_setting("force_sub")
     
-    if force_sub_status == "on" and not is_admin(user.id):
+    if force_sub_status == "on" and user and not is_admin(user.id):
         reply_markup = get_subscription_keyboard()
         if len(reply_markup.inline_keyboard) == 1:
             await show_main_menu(update)
@@ -108,16 +108,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await show_main_menu(update)
 
 async def show_main_menu(update: Update):
+    c_classic = get_section_count("db_classic")
+    c_kai1 = get_section_count("db_kai1")
+    c_kai2 = get_section_count("db_kai2")
+    c_super = get_section_count("db_super")
+    c_gt = get_section_count("db_gt")
+    c_daima = get_section_count("db_daima")
+    c_heroes = get_section_count("db_heroes")
+    c_super_remake = get_section_count("db_super_remake")
+    c_specials = get_section_count("db_specials")
+    c_movies = get_section_count("db_movies")
+
     keyboard = [
-        [InlineKeyboardButton("📂 --- القسم الأول (البداية حتى آرك سيل) ---", callback_data="none")],
-        [InlineKeyboardButton("🐉 الكلاسيكي (153)", callback_data="db_classic"), InlineKeyboardButton("⚡ كاي الأول (97)", callback_data="db_kai1")],
-        
-        [InlineKeyboardButton("📂 --- القسم الثاني (من ماجين بو وحتى النهاية) ---", callback_data="none")],
-        [InlineKeyboardButton("⚔️ زد كاي 2 (61)", callback_data="db_kai2"), InlineKeyboardButton("🔥 سوبر (131)", callback_data="db_super")],
-        [InlineKeyboardButton("🌀 جي تي (64)", callback_data="db_gt"), InlineKeyboardButton("✨ دايما (20)", callback_data="db_daima")],
-        [InlineKeyboardButton("💫 هيروز (56)", callback_data="db_heroes"), InlineKeyboardButton("✨ سوبر ريمك (20)", callback_data="db_super_remake")],
-        
-        [InlineKeyboardButton("⭐ الحلقات الخاصة", callback_data="db_specials"), InlineKeyboardButton("🎬 الأفلام (21)", callback_data="db_movies")],
+        [InlineKeyboardButton(f"🐉 الكلاسيكي ({c_classic})", callback_data="db_classic"), InlineKeyboardButton(f"⚡ كاي الأول ({c_kai1})", callback_data="db_kai1")],
+        [InlineKeyboardButton(f"⚔️ زد كاي 2 ({c_kai2})", callback_data="db_kai2"), InlineKeyboardButton(f"🔥 سوبر ({c_super})", callback_data="db_super")],
+        [InlineKeyboardButton(f"🌀 جي تي ({c_gt})", callback_data="db_gt"), InlineKeyboardButton(f"✨ دايما ({c_daima})", callback_data="db_daima")],
+        [InlineKeyboardButton(f"💫 هيروز ({c_heroes})", callback_data="db_heroes"), InlineKeyboardButton(f"✨ سوبر ريمك ({c_super_remake})", callback_data="db_super_remake")],
+        [InlineKeyboardButton(f"⭐ الحلقات الخاصة ({c_specials})", callback_data="db_specials"), InlineKeyboardButton(f"🎬 الأفلام ({c_movies})", callback_data="db_movies")],
         [InlineKeyboardButton("📖 معلومات الأقسام والحلقات المتوفرة", callback_data="bot_info")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -135,9 +142,10 @@ async def show_main_menu(update: Update):
         await update.callback_query.message.reply_text(welcome_text, reply_markup=reply_markup)
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not is_admin(user_id):
-        await update.message.reply_text("عذراً، هذا الأمر مخصص للمشرفين فقط. 🌸")
+    user = update.effective_user
+    if not user or not is_admin(user.id):
+        if update.message:
+            await update.message.reply_text("عذراً، هذا الأمر مخصص للمشرفين فقط. 🌸")
         return
 
     force_sub_status = get_setting("force_sub")
@@ -146,22 +154,23 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
         [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+        [InlineKeyboardButton("✏️ تعديل وإدارة أرقام والحلقات", callback_data="edit_episodes_menu")],
         [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
         [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
         [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     admin_text = "🎛️ أهلاً بك في لوحة تحكم الأدمن المباشرة:\n\nاختر ما تريد فعله من الأزرار بالأسفل:"
-    await update.message.reply_text(admin_text, reply_markup=reply_markup)
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message:
+        await update.message.reply_text(admin_text, reply_markup=reply_markup)
+    elif update.callback_query:
+        await update.callback_query.message.reply_text(admin_text, reply_markup=reply_markup)
+    async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    user_id = query.from_user.id
-    
-    if data == "none":
-        return
+    user = query.from_user
+    user_id = user.id if user else 0
 
     if data == "toggle_sub":
         if not is_admin(user_id):
@@ -174,6 +183,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_txt}", callback_data="toggle_sub")],
             [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+            [InlineKeyboardButton("✏️ تعديل وإدارة أرقام والحلقات", callback_data="edit_episodes_menu")],
             [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
             [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
             [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
@@ -184,21 +194,21 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif data == "bot_info":
         sections = [
-            ("db_classic", "🐉 الكلاسيكي"),
-            ("db_kai1", "⚡ دراغون بول كاي - الجزء الأول"),
-            ("db_kai2", "⚔️ دراغون بول زد كاي - الجزء الثاني (الفصول الأخيرة)"),
-            ("db_super", "🔥 دراغون بول سوبر"),
-            ("db_gt", "🌀 دراغون بول جي تي"),
-            ("db_daima", "✨ دراغون بول دايما"),
-            ("db_heroes", "💫 سوبر دراغون بول هيروز"),
-            ("db_super_remake", "✨ سوبر ريمك"),
-            ("db_specials", "⭐ الحلقات الخاصة"),
-            ("db_movies", "🎬 الأفلام السينمائية")
+            ("db_classic", "الكلاسيكي"),
+            ("db_kai1", "دراغون بول كاي - الجزء الأول"),
+            ("db_kai2", "دراغون بول زد كاي - الجزء الثاني"),
+            ("db_super", "دراغون بول سوبر"),
+            ("db_gt", "دراغون بول جي تي"),
+            ("db_daima", "دراغون بول دايما"),
+            ("db_heroes", "سوبر دراغون بول هيروز"),
+            ("db_super_remake", "سوبر ريمك"),
+            ("db_specials", "الحلقات الخاصة"),
+            ("db_movies", "الأفلام السينمائية")
         ]
-        info_msg = "📖 **معلومات الأقسام وحالة الحلقات المتوفرة في البوت:**\n\n"
+        info_msg = "معلومات الأقسام وحالة الحلقات المتوفرة في البوت:\n\n"
         for code, name in sections:
             cnt = get_section_count(code)
-            info_msg += f"• **{name}**: تم رفع `{cnt}` حلقة متوفرة ✅\n"
+            info_msg += f"• {name}: تم رفع {cnt} حلقة متوفرة ✅\n"
         
         keyboard = [[InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="back_to_main")]]
         await query.message.edit_text(info_msg, reply_markup=InlineKeyboardMarkup(keyboard))
@@ -215,6 +225,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(
             "👤 **إضافة مطور أو متحكم جديد:**\n\n"
             "أرسل الآن (آي دي / ID) الشخص المراد إضافته كأدمن في رسالة جديدة:"
+        )
+        return
+
+    elif data == "edit_episodes_menu":
+        if not is_admin(user_id):
+            return
+        keyboard = [
+            [InlineKeyboardButton("🗑️ حذف حلقة محددة", callback_data="delete_ep_prompt")],
+            [InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")]
+        ]
+        await query.message.reply_text(
+            "✏️ **تعديل وإدارة الحلقات:**\n\n"
+            "اختر الإجراء المطلوب:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    elif data == "delete_ep_prompt":
+        if not is_admin(user_id):
+            return
+        context.user_data['waiting_for_delete_ep'] = True
+        await query.message.reply_text(
+            "🗑️ **حذف حلقة:**\n\n"
+            "أرسل اسم القسم ورقم الحلقة هكذا مثال:\n`db_super 5`\nأو رقم الحلقة مباشرة إذا كنت قد حددت القسم مسبقاً."
         )
         return
 
@@ -283,6 +317,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
             [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+            [InlineKeyboardButton("✏️ تعديل وإدارة أرقام والحلقات", callback_data="edit_episodes_menu")],
             [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
             [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
             [InlineKeyboardButton("📋 عرض ونسخ قائمة الحلقات", callback_data="list_episodes")],
@@ -323,9 +358,9 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message:
         return
-    user_id = update.effective_user.id
+    user = update.effective_user
+    user_id = user.id if user else 0
 
-    # إضافة مطور جديد
     if is_admin(user_id) and context.user_data.get('waiting_for_new_admin') and update.message.text:
         text = update.message.text.strip()
         context.user_data.pop('waiting_for_new_admin', None)
@@ -338,6 +373,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ يرجى إرسال رقم الآي دي صحيحاً ومكوناً من أرقام فقط.")
         return
 
+    if is_admin(user_id) and context.user_data.get('waiting_for_delete_ep') and update.message.text:
+        text = update.message.text.strip()
+        context.user_data.pop('waiting_for_delete_ep', None)
+        parts = text.split()
+        if len(parts) == 2:
+            sec, ep = parts[0], parts[1]
+            cursor.execute("DELETE FROM episodes WHERE section = ? AND ep_number = ?", (sec, ep))
+            conn.commit()
+            await update.message.reply_text(f"🗑️ تم حذف الحلقة ({ep}) من القسم ({sec}) بنجاح.")
+        else:
+            await update.message.reply_text("⚠️ الصيغة غير صحيحة. أرسل هكذا مثلاً: `db_super 5`")
+        return
+
     if is_admin(user_id) and 'waiting_for_link' in context.user_data and update.message.text:
         text = update.message.text.strip()
         link_type = context.user_data.pop('waiting_for_link')
@@ -346,7 +394,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"تم تحديث رابط ({link_type}) بنجاح! 🚀")
         return
 
-    # التخزين التلقائي للفيديوهات والملفات المرسلة بعد اختيار القسم
     if is_admin(user_id) and f'admin_sec_{user_id}' in context.bot_data:
         media_file = update.message.video or update.message.document
         if media_file:
@@ -413,4 +460,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-                      
+    
