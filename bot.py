@@ -110,6 +110,7 @@ def get_section_count(section_id):
     cursor.execute("SELECT COUNT(*) FROM episodes WHERE section_id = ?", (section_id,))
     row = cursor.fetchone()
     return row[0] if row else 0
+
 def get_subscription_keyboard(lang="ar"):
     keyboard = []
     link_mapping = [
@@ -129,7 +130,6 @@ def get_subscription_keyboard(lang="ar"):
     check_text = "🔄 Check Subscription" if lang == "en" else "🔄 تحقق من الاشتراك"
     keyboard.append([InlineKeyboardButton(check_text, callback_data="check_sub")])
     return InlineKeyboardMarkup(keyboard)
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     force_sub_status = get_setting("force_sub")
@@ -246,7 +246,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(text, reply_markup=reply_markup)
     elif update.callback_query:
         await update.callback_query.message.reply_text(text, reply_markup=reply_markup)
-  async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -541,4 +541,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-          
+    
