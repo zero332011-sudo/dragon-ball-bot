@@ -231,7 +231,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [
         [InlineKeyboardButton(f"حالة الاشتراك الإجباري: {status_text}", callback_data="toggle_sub")],
-        [InlineKeyboardButton("➕ إضافة حلقات جديدة (اختر القسم)", callback_data="admin_sections_menu")],
+        [InlineKeyboardButton("➕ إضافة حلقات جديدة", callback_data="admin_anime_choice")],
         [InlineKeyboardButton("✏️ تعديل وإدارة أرقام والحلقات", callback_data="edit_episodes_menu")],
         [InlineKeyboardButton("👤 إضافة مطور / متحكم جديد", callback_data="add_admin_prompt")],
         [InlineKeyboardButton("🔗 إضافة وتعديل الروابط للمنصات", callback_data="admin_links_menu")],
@@ -296,16 +296,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await admin_panel(update, context)
         return
 
-    elif data == "admin_sections_menu":
+    elif data == "admin_anime_choice":
         if not is_admin(user_id):
             return
-        cursor.execute("SELECT id, name_ar FROM sections")
+        cursor.execute("SELECT id, name_ar FROM animes")
+        animes = cursor.fetchall()
+        keyboard = []
+        for a_id, a_name in animes:
+            keyboard.append([InlineKeyboardButton(f"🎬 {a_name}", callback_data=f"upload_anime_{a_id}")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_admin")])
+        await query.message.edit_text("اختر الأنمي لعرض أقسامه ورفع الحلقات:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif data.startswith("upload_anime_"):
+        if not is_admin(user_id):
+            return
+        anime_id = data.replace("upload_anime_", "")
+        cursor.execute("SELECT id, name_ar FROM sections WHERE anime_id = ?", (anime_id,))
         sections = cursor.fetchall()
         keyboard = []
         for s_id, s_name in sections:
             cnt = get_section_count(s_id)
             keyboard.append([InlineKeyboardButton(f"{s_name} ({cnt})", callback_data=f"upload_sec_{s_id}")])
-        keyboard.append([InlineKeyboardButton("🔙 رجوع لوحة التحكم", callback_data="back_to_admin")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="admin_anime_choice")])
         await query.message.edit_text("اختر القسم لرفع الحلقات:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
@@ -589,4 +602,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-      
+        
