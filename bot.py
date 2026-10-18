@@ -239,7 +239,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🎬 إضافة أنمي جديد", callback_data="add_anime_prompt")],
         [InlineKeyboardButton("📂 إضافة قسم جديد", callback_data="add_section_anime_choice")],
         [InlineKeyboardButton("✏️ تعديل اسم قسم", callback_data="edit_section_anime_choice")],
-        [InlineKeyboardButton("🖼️ إضافة صورة لقسم أو لنطاق حلقات", callback_data="add_image_prompt")],
+        [InlineKeyboardButton("🖼️ إضافة صورة لقسم أو لنطاق حلقات", callback_data="add_image_anime_choice")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     text = "🎛️ أهلاً بك في لوحة تحكم الأدمن المباشرة:\n\nاختر ما تريد فعله من الأزرار بالأسفل:"
@@ -453,9 +453,37 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("✏️ أرسل الاسم الجديد للقسم بالهيئة التالية:\n`الاسم الجديد بالعربي | الاسم الجديد بالانجلش`")
         return
 
-    elif data == "add_image_prompt":
-        context.user_data['waiting_for_image_type'] = True
-        await query.message.reply_text("🖼️ أرسل نوع الصورة:\nللقسم: `section | معرف_القسم`\nلنطاق حلقات: `range | معرف_القسم | من_رقم | إلى_رقم`")
+    elif data == "add_image_anime_choice":
+        if not is_admin(user_id):
+            return
+        cursor.execute("SELECT id, name_ar FROM animes")
+        animes = cursor.fetchall()
+        keyboard = []
+        for a_id, a_name in animes:
+            keyboard.append([InlineKeyboardButton(f"🎬 {a_name}", callback_data=f"img_anime_{a_id}")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_admin")])
+        await query.message.edit_text("🖼️ اختر الأنمي لإضافة صورة لأحد أقسامه:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif data.startswith("img_anime_"):
+        if not is_admin(user_id):
+            return
+        anime_id = data.replace("img_anime_", "")
+        cursor.execute("SELECT id, name_ar FROM sections WHERE anime_id = ?", (anime_id,))
+        sections = cursor.fetchall()
+        keyboard = []
+        for s_id, s_name in sections:
+            keyboard.append([InlineKeyboardButton(f"📂 {s_name}", callback_data=f"img_sec_{s_id}")])
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="add_image_anime_choice")])
+        await query.message.edit_text("اختر القسم المراد إرسال صورة له:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    elif data.startswith("img_sec_"):
+        if not is_admin(user_id):
+            return
+        sec_id = data.replace("img_sec_", "")
+        context.user_data['target_section_for_image'] = sec_id
+        await query.message.reply_text("📸 تم اختيار القسم بنجاح. أرسل الصورة الآن لربطها بالقسم:")
         return
 
     elif data == "back_to_admin":
@@ -523,27 +551,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ صيغة غير صحيحة.")
         return
 
-    if is_admin(user_id) and context.user_data.get('waiting_for_image_type'):
-        context.user_data.pop('waiting_for_image_type', None)
-        parts = [p.strip() for p in text.split('|')]
-        context.user_data['image_target'] = parts
-        await update.message.reply_text("📸 الآن أرسل الصورة المراد ربطها:")
-        return
-
-    if is_admin(user_id) and 'image_target' in context.user_data:
+    if is_admin(user_id) and 'target_section_for_image' in context.user_data:
         photo = update.message.photo
         if photo:
             file_id = photo[-1].file_id
-            target = context.user_data.pop('image_target')
-            if target[0] == 'section':
-                cursor.execute("UPDATE sections SET image_id = ? WHERE id = ?", (file_id, target[1]))
-                conn.commit()
-                await update.message.reply_text("✅ تمت إضافة صورة القسم بنجاح!")
-            elif target[0] == 'range':
-                cursor.execute("INSERT INTO episode_ranges (section_id, start_ep, end_ep, image_id) VALUES (?, ?, ?, ?)", 
-                               (target[1], int(target[2]), int(target[3]), file_id))
-                conn.commit()
-                await update.message.reply_text("✅ تمت إضافة صورة نطاق الحلقات بنجاح!")
+            sec_id = context.user_data.pop('target_section_for_image')
+            cursor.execute("UPDATE sections SET image_id = ? WHERE id = ?", (file_id, sec_id))
+            conn.commit()
+            await update.message.reply_text("✅ تمت إضافة صورة القسم بنجاح!")
         return
 
     if is_admin(user_id) and context.user_data.get('waiting_for_delete'):
@@ -602,3 +617,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    
