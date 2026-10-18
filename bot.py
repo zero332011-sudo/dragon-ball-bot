@@ -589,7 +589,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"عذراً، الحلقة رقم ({text}) غير متوفرة حالياً ❌.")
 
 def main():
-    TOKEN = "8911756458:AAEADtUnJ5pYSv5SshjjXuMUd4GA9TnAMYY"
+    TOKEN = "8911756458:AAGEeenrc9oUVi-Yh4kh0iVogRpgw5rfjg"
     app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
