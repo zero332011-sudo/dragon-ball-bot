@@ -615,6 +615,5 @@ def main():
     print("Complete bot (old + new features) is running smoothly...")
     app.run_polling()
 
-if __name__ == '__main__':
-    main()
-    
+if __name__ == "__main__":
+    bot.infinity_polling()
